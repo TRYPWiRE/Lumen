@@ -1,5 +1,11 @@
 {
-  "app": {},
+  "app": {
+    "version": "0.6.0",
+    "url": "https://github.com/TRYPWiRE/Lumen/releases/download/v0.6.0/LumenSetup-0.6.0.exe",
+    "sha256": "c21b0546183e05faf58d2266fefa37124f0352c6c7ab4f4136bb7c7d71653a82",
+    "size": 155022434,
+    "notes": ""
+  },
   "extensions": [
     {
       "id": "adjustments",
@@ -9,8 +15,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/adjustments-1.0.0.zip",
-      "sha256": "b909017e5d8324991178a2b25e4b37b6da0385d08414c6d33462d624a9f0f941",
-      "size": 6811
+      "sha256": "bb31adf576f2b7cd727b6f618188fec4ba0a1bc6af662ed71a8adb6125e034e6",
+      "size": 20885
     },
     {
       "id": "background-remover",
@@ -20,8 +26,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/background-remover-1.0.1.zip",
-      "sha256": "66a753dbf6366c217fc7f68b20a459d1507f9e95d9b8838d19761fe8735a5b52",
-      "size": 11755,
+      "sha256": "a4cddcb546723f46e0966175f329d1cafe87b134df86b224756ec5bacc5cda12",
+      "size": 37144,
       "requires": [
         "onnxruntime"
       ]
@@ -34,8 +40,22 @@
       "author": "Lumen",
       "min_app": "0.2.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/basic-filters-1.1.0.zip",
-      "sha256": "3fac65b61512311effa58ced0b2debeee9e19eeaf48782302823c3c6679abde2",
-      "size": 2653
+      "sha256": "790d51ad1d94b4c6e873a12f6ff9580da3bacd962abc11663bfe904342d17abd",
+      "size": 6735
+    },
+    {
+      "id": "batch-converter",
+      "name": "Batch Converter",
+      "version": "1.0.0",
+      "description": "Convert and resize images in batches in its own tab: PNG, JPEG, WebP, AVIF, BMP, GIF, TIFF and ICO from almost anything - including PSD, HEIC and camera RAW (Canon, Nikon, Sony, Fuji\u2026). Animated GIF/WebP stay animated. Also lets File \u25b8 Open read HEIC, AVIF and RAW, and Save As write GIF, AVIF and ICO.",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/batch-converter-1.0.0.zip",
+      "sha256": "7626671d81aa4aa4565e06ea0e92e60afbad26f4def7e891dc3d54cf92f25982",
+      "size": 17763,
+      "requires": [
+        "pillow"
+      ]
     },
     {
       "id": "creative-filters",
@@ -45,8 +65,36 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/creative-filters-1.0.0.zip",
-      "sha256": "08698c40de840a29ba4912718be9156d47e8b30678b414791fdd2b76203ec843",
-      "size": 6120
+      "sha256": "f0a7cd2c48b55c1208ca03febe77f4c95524b58eb071bf20c0e32a6a99116a13",
+      "size": 19927
+    },
+    {
+      "id": "gif-optimiser",
+      "name": "GIF Optimiser",
+      "version": "1.0.0",
+      "description": "Shrink a GIF in its own tab: a Compression slider, one-click Discord Emoji / Sticker presets and 1-500 MiB target sizes, a before/after preview, and optional resizing for social posts.",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/gif-optimiser-1.0.0.zip",
+      "sha256": "245883091329a3d719ed834821bc08444dbb7f6ba656b8e77b662597e08f7b37",
+      "size": 3503,
+      "requires": [
+        "pillow"
+      ]
+    },
+    {
+      "id": "image-optimiser",
+      "name": "Image Optimiser",
+      "version": "1.0.0",
+      "description": "Shrink a still image in its own tab: Compression slider, Discord Emoji / Sticker presets, 1-500 MiB targets and social-media sizes. Works on files or straight from the picture open in Lumen.",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/image-optimiser-1.0.0.zip",
+      "sha256": "794bee064e0d0c277c53cd6b0d39650ff6818a26b19e4c93242f6ea47bf4bf6c",
+      "size": 3183,
+      "requires": [
+        "pillow"
+      ]
     },
     {
       "id": "layer-effects",
@@ -56,8 +104,47 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/layer-effects-1.0.0.zip",
-      "sha256": "0fa49221dfb0eda8407e76f2219cbe2b11441007b021aefa22107b65a6a1a158",
-      "size": 3771
+      "sha256": "bb80bcb4754484097c889764cea5757fcd923dbc3d2a3190224cd288ee32f94e",
+      "size": 11370
+    },
+    {
+      "id": "overlay-studio",
+      "name": "Overlay Studio",
+      "version": "1.0.0",
+      "description": "Place one image over another in its own tab - animated GIFs and WebPs keep moving. Drag or snap the forefront to 9 positions, scale it, fade it, and save as PNG, GIF, WebP or AVIF, or open the result in Lumen. Either image can come straight from Lumen.",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/overlay-studio-1.0.0.zip",
+      "sha256": "9b412d0b09a0975a250f9309923b858d57a160facbd005c69d2c5e8167fea5b9",
+      "size": 28316,
+      "requires": [
+        "pillow"
+      ]
+    },
+    {
+      "id": "video-to-gif",
+      "name": "Video to GIF",
+      "version": "1.0.0",
+      "description": "Turn a clip from any common video (MP4, MOV, MKV, WebM, AVI\u2026) into a GIF or animated WebP in its own tab: pick start, length, frame rate and width, see the real file size before saving, or open the frames as layers in Lumen.",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/video-to-gif-1.0.0.zip",
+      "sha256": "c0bd5298077d852b506307dc110a10845301a386d90d9ab397f78db32529bb9b",
+      "size": 13492,
+      "requires": [
+        "pillow"
+      ]
+    },
+    {
+      "id": "video-to-image",
+      "name": "Video to Image",
+      "version": "1.0.0",
+      "description": "Scrub through any video frame by frame in its own tab (zoom the slider in for precise picking), then save the exact frame, copy it, open it in Lumen or add it as a layer. Can also export a whole run of frames as PNGs or layers.",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/video-to-image-1.0.0.zip",
+      "sha256": "e3e9ac97ac54b4cedf807561e3df6c720f2d05074047906683352bdb3116d982",
+      "size": 15505
     },
     {
       "id": "web-images-extractor",
@@ -67,10 +154,38 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/web-images-extractor-1.0.2.zip",
-      "sha256": "7ff447671652809dd8c22f64ba5665eecca4afaac82cb614936832dbf2bd9112",
-      "size": 11418,
+      "sha256": "3390e0cfa751ed8fab79ebf96995a40649c79959ce163fdeaab7a4de0f3d656d",
+      "size": 33060,
       "requires": [
         "qtwebengine"
+      ]
+    },
+    {
+      "id": "webp-flipbook",
+      "name": "WebP Flipbook",
+      "version": "1.0.0",
+      "description": "Turn animated WebPs and flipbook / sprite-sheet images into animated GIFs in their own tab, with automatic grid detection, a grid overlay, an animation preview, transparency kept, PNG frame export, and frames-as-layers in Lumen.",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/webp-flipbook-1.0.0.zip",
+      "sha256": "2714bdc0b721d56bbea487966db2f2fab2e9ff48ed5716871061b11255de558f",
+      "size": 26329,
+      "requires": [
+        "pillow"
+      ]
+    },
+    {
+      "id": "webp-to-gif",
+      "name": "WebP to GIF",
+      "version": "1.0.0",
+      "description": "Batch-convert WebP files (animated or still) to GIF in their own tab, with Quality, Frames and Width controls, target-size presets, a live preview of each result, and Open in Lumen (frames as layers).",
+      "author": "Lumen",
+      "min_app": "0.6.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/webp-to-gif-1.0.0.zip",
+      "sha256": "0fa53f4be79ed526af3666f3553c2e4255189bfa1134d2a4ea0bf4f94c0a690b",
+      "size": 10983,
+      "requires": [
+        "pillow"
       ]
     }
   ],
@@ -81,7 +196,7 @@
         "version": "6.11.2",
         "qt": "6.11.2",
         "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/qtwebengine-6.11.2-win64.zip",
-        "sha256": "682f5a2c212631309891d0696d4b48429c912801f72960ea41be47ab8e7506ab",
+        "sha256": "3fd1a08f6e98f5791b9352afc4f31482d6f285792ad9166ac5ca6fa9167c26d5",
         "size": 144786234
       }
     },
@@ -91,8 +206,28 @@
         "version": "1.31.0",
         "qt": "",
         "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/onnxruntime-1.31.0-win64.zip",
-        "sha256": "efbb2902583f32a03e7a6b494059d559e916d657d293d6406ee525b3bc09b642",
+        "sha256": "c9a5fb4ecf88f68847da33bfd7f69250446ed8bca6ac146017d42275ba58d773",
         "size": 15860794
+      }
+    },
+    "pillow": {
+      "win64": {
+        "name": "Imaging library (Pillow)",
+        "version": "12.3.0",
+        "qt": "",
+        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/pillow-12.3.0-win64.zip",
+        "sha256": "999dde7531c365cee21cb7c6d1135a2f4b11aaafbcbc4db9f356e1c9f10261a0",
+        "size": 7203335
+      }
+    },
+    "camera-formats": {
+      "win64": {
+        "name": "HEIC + camera RAW support",
+        "version": "1.8.0+0.27.1",
+        "qt": "",
+        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/camera-formats-1.8.0+0.27.1-win64.zip",
+        "sha256": "7adddceb6d67b28259f75373064ff70be90727e82cc46289cdb489a2e08c4144",
+        "size": 7711286
       }
     }
   }
