@@ -1,0 +1,8 @@
+{
+  "id": "basic-filters",
+  "name": "Basic Filters",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Gaussian & Box Blur, Unsharp Mask, Sharpen, Add Noise, Mosaic, plus Brightness/Contrast, Posterize and Threshold adjustments.",
+  "min_app": "0.2.0"
+}

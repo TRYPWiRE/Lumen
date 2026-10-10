@@ -1,0 +1,22 @@
+{
+  "app": {
+    "version": "0.2.0",
+    "url": "https://github.com/TRYPWiRE/Lumen/releases/download/v0.2.0/LumenSetup-0.2.0.exe",
+    "sha256": "df2d9020928354fdc5a653841e0c539c3c20f2bb26898ee275291d1d92340e52",
+    "size": 36244446,
+    "notes": ""
+  },
+  "extensions": [
+    {
+      "id": "basic-filters",
+      "name": "Basic Filters",
+      "version": "1.0.0",
+      "description": "Gaussian & Box Blur, Unsharp Mask, Sharpen, Add Noise, Mosaic, plus Brightness/Contrast, Posterize and Threshold adjustments.",
+      "author": "Lumen",
+      "min_app": "0.2.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/basic-filters-1.0.0.zip",
+      "sha256": "7cacdab033829ee26899c64fd18c301b2994026b65ce050d235c902c5bc510d0",
+      "size": 2549
+    }
+  ]
+}
