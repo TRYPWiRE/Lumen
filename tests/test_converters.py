@@ -642,6 +642,89 @@ class TestBatchConverter(ToolBase):
         self.assertEqual(p.queue.results()[os.path.abspath(h)]["size"], (48, 32))
 
 
+@needs_pil
+class TestWebImagesToOverlay(ToolBase):
+    ext = "overlay-studio"
+
+    def test_send_collected_images_to_both_slots(self):
+        from importlib import import_module
+        from test_extension_packs import Server, load_pkg, wait
+        from lumen.extensions.api import ExtensionAPI
+        srv = Server()
+        try:
+            _media.animated(os.path.join(srv.root, "anim.gif"), n=5, w=200, h=120, transparent=False)
+            q = QImage(60, 40, QImage.Format.Format_ARGB32)
+            q.fill(QColor("#ff0000"))
+            q.save(os.path.join(srv.root, "sticker.png"))
+            pkg = load_pkg("web-images-extractor")
+            gallery = import_module(pkg.__name__ + ".gallery")
+            fetcher = import_module(pkg.__name__ + ".fetcher")
+            g = gallery.Gallery(ExtensionAPI(self.w, None), fetcher.Fetcher())
+            g.show()
+            g.show_urls([f"{srv.base}/anim.gif", f"{srv.base}/sticker.png"], referer=srv.base)
+            self.assertTrue(wait(g.finished, 15))
+            anim, sticker = g.cards
+            self.assertIs(g.overlay_studio(), self.page)
+            anim._sync_overlay()
+            self.assertTrue(anim.overlay_bg.isEnabled())
+            self.assertFalse(anim.overlay_missing.isVisible())
+            self.assertTrue(g.send_to_overlay([anim], "bg"))
+            self.assertTrue(g.send_to_overlay([sticker], "fg"))
+            media.wait_all()
+            app.processEvents()
+            self.assertIs(self.w.workspace_stack.currentWidget(), self.page)     # jumps to the studio
+            self.assertEqual(self.page.bg.size, (200, 120))
+            self.assertEqual(len(self.page.bg.frames), 5)                         # animation kept
+            self.assertEqual(self.page.fg.size, (60, 40))
+            self.assertIsNotNone(self.page.fg_item)
+            frames, _ = self.page.render()
+            self.assertEqual(len(frames), 5)
+            g.close()
+        finally:
+            srv.stop()
+
+    def test_without_overlay_studio_the_menu_offers_to_install_it(self):
+        from importlib import import_module
+        from test_extension_packs import load_pkg
+        from lumen.extensions.api import ExtensionAPI
+        self.w.services.pop("overlay-studio", None)
+        pkg = load_pkg("web-images-extractor")
+        gallery = import_module(pkg.__name__ + ".gallery")
+        fetcher = import_module(pkg.__name__ + ".fetcher")
+        g = gallery.Gallery(ExtensionAPI(self.w, None), fetcher.Fetcher())
+        self.assertIsNone(g.overlay_studio())
+        card = gallery.Card(g, 0, "https://example.com/x.png")
+        card._sync_overlay()
+        self.assertFalse(card.overlay_bg.isVisible())
+        self.assertTrue(card.overlay_missing.isVisible())
+        self.assertFalse(g.send_to_overlay([card], "bg"))
+
+
+class TestAbout(ToolBase):
+    def test_about_has_the_community_links(self):
+        from lumen import about
+        from PyQt6.QtGui import QDesktopServices
+        opened = []
+        self.patch(QDesktopServices, "openUrl", staticmethod(lambda u: opened.append(u.toString())))
+        self.patch(about.AboutDialog, "exec", lambda dlg: 0)
+        dlg = self.w.about()
+        self.assertEqual([c.url for c in dlg.cards], [about.TOPTRACKING_URL, about.TKO_URL, about.GITHUB_URL])
+        for c in dlg.cards:
+            self.assertTrue(os.path.isfile(about.asset(os.path.basename(
+                next(x[0] for x in about.COMMUNITY if x[5] == c.url)))))
+            c.button.click()
+        self.assertEqual(opened, ["https://discord.gg/wSGNAa5aCk", "https://www.discord.gg/TKO1",
+                                  "https://github.com/TRYPWiRE"])
+        dlg.show()
+        app.processEvents()
+        tko = dlg.cards[1].logo
+        self.assertIsNotNone(tko.movie)
+        self.assertGreater(tko.movie.frameCount(), 1)                  # animated logo plays
+        self.assertIsNotNone(dlg.cards[0].logo.pixmap)
+        dlg.grab()
+        dlg.close()
+
+
 class TestEnsureRuntime(ToolBase):
     ext = "video-to-image"
 

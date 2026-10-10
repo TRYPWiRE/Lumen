@@ -1,9 +1,9 @@
 {
   "app": {
-    "version": "0.6.0",
-    "url": "https://github.com/TRYPWiRE/Lumen/releases/download/v0.6.0/LumenSetup-0.6.0.exe",
-    "sha256": "c21b0546183e05faf58d2266fefa37124f0352c6c7ab4f4136bb7c7d71653a82",
-    "size": 155022434,
+    "version": "0.6.1",
+    "url": "https://github.com/TRYPWiRE/Lumen/releases/download/v0.6.1/LumenSetup-0.6.1.exe",
+    "sha256": "7e766618d97c31170d997d16b55e6c8978ecd5e74b612ceb04ae9c90bd01981b",
+    "size": 155982858,
     "notes": ""
   },
   "extensions": [
@@ -110,13 +110,13 @@
     {
       "id": "overlay-studio",
       "name": "Overlay Studio",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Place one image over another in its own tab - animated GIFs and WebPs keep moving. Drag or snap the forefront to 9 positions, scale it, fade it, and save as PNG, GIF, WebP or AVIF, or open the result in Lumen. Either image can come straight from Lumen.",
       "author": "Lumen",
       "min_app": "0.6.0",
-      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/overlay-studio-1.0.0.zip",
-      "sha256": "9b412d0b09a0975a250f9309923b858d57a160facbd005c69d2c5e8167fea5b9",
-      "size": 28316,
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/overlay-studio-1.0.1.zip",
+      "sha256": "f81d2ed7da73954b02ba97b3ab817698ab303b1ca4d83b2a6c2bfb42d84309ca",
+      "size": 29173,
       "requires": [
         "pillow"
       ]
@@ -149,13 +149,13 @@
     {
       "id": "web-images-extractor",
       "name": "Web Images Extractor",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "A built-in web browser in its own tab. Browse any page, collect every image it shows (lazy-loaded ones too), then add them to your Lumen project as layers, open them as documents or save them.",
       "author": "Lumen",
       "min_app": "0.4.0",
-      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/web-images-extractor-1.0.2.zip",
-      "sha256": "3390e0cfa751ed8fab79ebf96995a40649c79959ce163fdeaab7a4de0f3d656d",
-      "size": 33060,
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/web-images-extractor-1.0.3.zip",
+      "sha256": "bd79dbb48e5848c60701cf27d7cda1d241ab424c778150d7fbb002a1fbe9c235",
+      "size": 35363,
       "requires": [
         "qtwebengine"
       ]
@@ -188,47 +188,5 @@
         "pillow"
       ]
     }
-  ],
-  "runtimes": {
-    "qtwebengine": {
-      "win64": {
-        "name": "Web engine (Chromium)",
-        "version": "6.11.2",
-        "qt": "6.11.2",
-        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/qtwebengine-6.11.2-win64.zip",
-        "sha256": "3fd1a08f6e98f5791b9352afc4f31482d6f285792ad9166ac5ca6fa9167c26d5",
-        "size": 144786234
-      }
-    },
-    "onnxruntime": {
-      "win64": {
-        "name": "AI engine (onnxruntime)",
-        "version": "1.31.0",
-        "qt": "",
-        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/onnxruntime-1.31.0-win64.zip",
-        "sha256": "c9a5fb4ecf88f68847da33bfd7f69250446ed8bca6ac146017d42275ba58d773",
-        "size": 15860794
-      }
-    },
-    "pillow": {
-      "win64": {
-        "name": "Imaging library (Pillow)",
-        "version": "12.3.0",
-        "qt": "",
-        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/pillow-12.3.0-win64.zip",
-        "sha256": "999dde7531c365cee21cb7c6d1135a2f4b11aaafbcbc4db9f356e1c9f10261a0",
-        "size": 7203335
-      }
-    },
-    "camera-formats": {
-      "win64": {
-        "name": "HEIC + camera RAW support",
-        "version": "1.8.0+0.27.1",
-        "qt": "",
-        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/camera-formats-1.8.0+0.27.1-win64.zip",
-        "sha256": "7adddceb6d67b28259f75373064ff70be90727e82cc46289cdb489a2e08c4144",
-        "size": 7711286
-      }
-    }
-  }
+  ]
 }

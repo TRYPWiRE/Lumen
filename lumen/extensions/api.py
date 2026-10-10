@@ -31,6 +31,10 @@
         api.add_file_writer("gif", "GIF", fn)     # Save As / Export As can write them: fn(qimage, path, doc)
         api.open_layers([qimage, …], "Name")      # new document, one layer per image (e.g. animation frames)
         api.ensure_runtime(["pillow"], then)      # download a runtime pack now (once), then(ok)
+
+    Working together (API 6):
+        api.provide("overlay-studio", obj)        # offer an object to other extensions
+        api.service("overlay-studio")             # the object, or None when that extension isn't installed
 """
 from PyQt6.QtGui import QAction, QKeySequence
 
@@ -38,7 +42,7 @@ from .. import __version__, imageops, media
 from ..tools import Tool
 
 
-API_VERSION = 5
+API_VERSION = 6
 
 
 class ExtensionAPI:
@@ -226,6 +230,25 @@ class ExtensionAPI:
                 then(True)
             return
         self._w.download_runtimes(missing, for_what or self.ext.name, then)
+
+    # ------------------------------------------------------------ extensions working together (API 6)
+    def provide(self, name, obj):
+        """Offer `obj` to other extensions under `name` (e.g. a tool page others can send images to)."""
+        self._w.services[name] = obj
+        return obj
+
+    def service(self, name):
+        """Something another extension offered with provide(), or None if it isn't installed / enabled."""
+        obj = self._w.services.get(name)
+        if obj is None:
+            return None
+        try:
+            from PyQt6 import sip
+            if isinstance(obj, sip.simplewrapper) and sip.isdeleted(obj):
+                return None
+        except Exception:
+            pass
+        return obj
 
     def theme_colors(self):
         """The current theme's colours as a dict of '#rrggbb' strings (keys: lumen.theme.KEYS)."""

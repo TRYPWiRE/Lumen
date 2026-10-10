@@ -1,4 +1,4 @@
-# Lumen v0.6.0
+# Lumen v0.6.1
 
 A Photoshop-style image editor written in Python with PyQt6.
 
@@ -10,6 +10,17 @@ python main.py
 ```
 
 You can also pass image paths on the command line (`python main.py photo.jpg`) or drag files onto the window.
+
+## New in v0.6.1
+
+- **Web Images Extractor → Overlay Studio.** Any collected image's **⋯** menu now has *Send to Overlay
+  Studio ▸ As Background Image / As Forefront Image*. Animated GIFs and WebPs stay animated. Without
+  Overlay Studio installed, the menu offers to install it.
+- **Overlay Studio:** a still image placed over an animation no longer adds extra frames, so exports are
+  smaller.
+- **Help ▸ About Lumen** has been redesigned, with links to our Discord servers (TopTracking.App and TKO
+  Gaming & Services) and GitHub.
+- Extensions can now offer things to each other: `api.provide(name, obj)` / `api.service(name)` (API 6).
 
 ## New in v0.6
 

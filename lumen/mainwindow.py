@@ -1282,8 +1282,10 @@ class MainWindow(QMainWindow):
         self._emit_ext("theme_changed", t)
 
     def about(self):
-        QMessageBox.about(self, "About Lumen",
-                          f"<h3>Lumen {__version__}</h3><p>A Photoshop-style image editor built with Python and Qt.</p>")
+        from .about import AboutDialog
+        dlg = AboutDialog(self)
+        dlg.exec()
+        return dlg
 
     # ---------------------------------------------------------------- drag & drop
     def dragEnterEvent(self, ev):
@@ -1320,6 +1322,7 @@ class MainWindow(QMainWindow):
         self.ext_events = {}
         self.file_readers = []          # [(('.heic', …), "HEIC images", fn(path) -> QImage)]
         self.file_writers = {}          # {"gif": ("GIF", fn(qimage, path, doc))}
+        self.services = {}              # extensions offering things to other extensions (API 6)
         self.ctx.toolChanged.connect(lambda t: self._emit_ext("tool_changed", t))
         self.last_filter = None
         self._ext_actions = []

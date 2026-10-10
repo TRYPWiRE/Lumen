@@ -59,10 +59,12 @@ def compose(bg, fg, x, y, scale, opacity, animate):
     """(frames, durations) of fg placed on bg at (x, y) in background pixels."""
     Image = media.PIL.Image
     if animate and (bg.animated or (fg and fg.animated)):
-        total = max(bg.total, fg.total if fg else 0)
-        starts = set(bg.boundaries(total))
-        if fg:
-            starts.update(fg.boundaries(total))
+        # only animated layers add frame boundaries (a still image never changes, so it adds none)
+        moving = [L for L in (bg, fg) if L is not None and L.animated]
+        total = max(L.total for L in moving)
+        starts = {0}
+        for L in moving:
+            starts.update(L.boundaries(total))
         starts = sorted(starts)[:MAX_OUTPUT_FRAMES]
         ends = starts[1:] + [total]
         timeline = []

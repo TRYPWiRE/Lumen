@@ -295,6 +295,19 @@ class OverlayPage(media.ToolPage):
         pil = media.qimage_to_pil(qimg)
         self._load(role, lambda: pil, name)
 
+    def receive(self, role, data, name="image"):
+        """Other extensions (e.g. Web Images Extractor) hand images over here. data: bytes (animation kept) or
+        a QImage. role: "bg" or "fg"."""
+        if role not in ("bg", "fg"):
+            raise ValueError("role must be 'bg' or 'fg'")
+        if isinstance(data, (bytes, bytearray)):
+            raw = bytes(data)
+            self._load(role, lambda: raw, name)
+        else:
+            self.load_image(role, QImage(data), name)
+        if self.api is not None:
+            self.api.show_workspace(self)
+
     def from_lumen(self, role):
         img = self.lumen_image()
         if img is None:
@@ -603,5 +616,7 @@ class OverlayPage(media.ToolPage):
 def register(api):
     page = OverlayPage(api)
     api.add_workspace("Overlay Studio", page, icon="overlay")
+    if hasattr(api, "provide"):                 # Lumen 0.6.1+: let other tools send images here
+        api.provide("overlay-studio", page)
     api.add_menu_action("Plugins", "Overlay Studio", lambda: api.show_workspace(page), needs_document=False)
     register.workspace = page

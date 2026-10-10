@@ -105,7 +105,17 @@ class Card(QFrame):
         menu.addAction("Copy Image Address", lambda: QGuiApplication.clipboard().setText(self.url))
         if not url.startswith("data:"):
             menu.addAction("Open Image in New Tab", lambda: self.gallery.open_in_tab(self.url))
-        for a in (self.open_act, self.save_act, self.copy_act):
+        menu.addSeparator()
+        self.overlay_menu = menu.addMenu("Send to Overlay Studio")
+        self.overlay_menu.setToolTip("Use this image as the background or the forefront in Overlay Studio")
+        self.overlay_bg = self.overlay_menu.addAction("As Background Image",
+                                                      lambda: self.gallery.send_to_overlay([self], "bg"))
+        self.overlay_fg = self.overlay_menu.addAction("As Forefront Image",
+                                                      lambda: self.gallery.send_to_overlay([self], "fg"))
+        self.overlay_missing = self.overlay_menu.addAction("Install Overlay Studio from Plugins ▸ Extensions…",
+                                                           self.gallery.get_overlay_studio)
+        menu.aboutToShow.connect(self._sync_overlay)
+        for a in (self.open_act, self.save_act, self.copy_act, self.overlay_bg, self.overlay_fg):
             a.setEnabled(False)
         more.setMenu(menu)
         row.addWidget(more)
@@ -141,8 +151,21 @@ class Card(QFrame):
             details += f" · {self.frames} frames"
         self.info.setText(details)
         self.info.setToolTip(f"Image {self.index + 1}: {details}")
-        for w in (self.add_btn, self.open_act, self.save_act, self.copy_act):
+        for w in (self.add_btn, self.open_act, self.save_act, self.copy_act, self.overlay_bg, self.overlay_fg):
             w.setEnabled(True)
+
+    def _sync_overlay(self):
+        have = self.gallery.overlay_studio() is not None
+        for a in (self.overlay_bg, self.overlay_fg):
+            a.setVisible(have)
+        self.overlay_missing.setVisible(not have)
+
+    def data(self):
+        """The original downloaded bytes (keeps GIF / WebP animation), or None."""
+        try:
+            return self.gallery.fetcher.get(self.url)
+        except Exception:
+            return None
 
     def big_enough(self, minimum):
         return self.image is not None and max(self.image.width(), self.image.height()) >= minimum
@@ -344,6 +367,28 @@ class Gallery(QWidget):
         for c in cards:
             c.check.setChecked(False)
         return len(cards)
+
+    def overlay_studio(self):
+        """Overlay Studio's page if that extension is installed (needs Lumen 0.6.1+), else None."""
+        svc = getattr(self.api, "service", None)
+        return svc("overlay-studio") if svc else None
+
+    def get_overlay_studio(self):
+        win = self.api.window()
+        if hasattr(win, "show_extensions"):
+            win.show_extensions()
+
+    def send_to_overlay(self, cards, role):
+        """Put a collected image into Overlay Studio as the background ("bg") or forefront ("fg")."""
+        studio = self.overlay_studio()
+        card = next((c for c in cards if c.image is not None), None)
+        if studio is None or card is None:
+            return False
+        data = card.data()
+        studio.receive(role, data if data else card.image, card.name())
+        where = "background" if role == "bg" else "forefront"
+        self.set_status(f"Sent {card.name()} to Overlay Studio as the {where}.")
+        return True
 
     def open_document(self, card):
         if card.image is not None:
