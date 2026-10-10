@@ -6,17 +6,12 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLa
 
 
 def _render_preview(doc, fn, values):
+    """Live preview on the active layer only (like Photoshop)."""
     rect = doc.selection_bounds() if doc.has_selection() else doc.rect()
-    if rect.isEmpty():
+    L = doc.active
+    if rect.isEmpty() or L is None or L.is_text or L.pixels_locked():
         return
-    processed = fn(doc.image.copy(rect), **values)
-    img = doc.image.copy()
-    p = QPainter(img)
-    doc.clip(p)
-    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-    p.drawImage(rect.topLeft(), processed)
-    p.end()
-    doc.set_preview(img)
+    doc.preview_region(rect, fn(L.region(rect), **values))
 
 
 class FilterDialog(QDialog):
@@ -113,6 +108,8 @@ def run_filter(window, title, fn, params):
     if doc is None:
         return False
     doc.commit_floating()
+    if doc.try_target("apply " + title) is None:      # locked / hidden / type layer the user won't rasterize
+        return False
     values = {}
     if params:
         dlg = FilterDialog(window, title, fn, params)

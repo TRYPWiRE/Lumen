@@ -188,12 +188,15 @@ class ExtensionsDialog(QDialog):
                 status = (f"Update available: v{remote['version']}" if ok
                           else f"v{remote['version']} available — needs Lumen {remote.get('min_app')}")
                 color = None if ok else "#ffcc80"
-            row = _Row(ext.name, ext.version, ext.author, ext.description, status, color)
+            author = (ext.author + " · " if ext.author else "") + ("Built-in" if ext.builtin else "")
+            row = _Row(ext.name, ext.version, author.strip(" ·"), ext.description, status, color)
             if update and versioning.compatible(remote.get("min_app"), __version__):
                 row.add_button("Update", lambda _, e=remote: self.w.install_extension(e), True)
             row.add_button("Disable" if enabled else "Enable",
                            lambda _, i=ext.id, en=enabled: self.mgr.set_enabled(i, not en))
-            row.add_button("Uninstall", lambda _, i=ext.id: self._uninstall(i))
+            import os as _os
+            if not ext.builtin or _os.path.isdir(_os.path.join(self.mgr.root, ext.id)):
+                row.add_button("Revert" if ext.builtin else "Uninstall", lambda _, i=ext.id: self._uninstall(i))
             v.insertWidget(v.count() - 1, row)
         # available
         v = self.available_list[1]

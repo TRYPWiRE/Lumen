@@ -350,33 +350,37 @@ class TestMoveAndPaste(Base):
         self.assertIsNone(self.doc.floating)
         self.assertEqual(rgb(self.px(15, 15)), (255, 0, 0))
 
-    def test_copy_paste_commit(self):
+    def test_copy_paste_makes_new_layer(self):
         self.doc.apply_region("setup", QRect(0, 0, 10, 10), lambda p: p.fillRect(QRect(0, 0, 10, 10), QColor(0, 255, 0)))
         p = QPainterPath()
         p.addRect(QRectF(0, 0, 10, 10))
         self.doc.set_selection(p)
         self.w.copy()
         self.w.paste()
-        self.assertIsNotNone(self.doc.floating)
+        self.assertEqual(len(self.doc.layers), 2)
+        L = self.doc.active
+        self.assertEqual(L.name, "Layer 1")
         self.assertEqual(self.w.ctx.tool.name, "move")
-        self.drag((100, 75), (150, 75))
-        self.w.A["deselect"].trigger()     # deselect commits the paste
-        self.assertIsNone(self.doc.floating)
-        self.assertEqual(self.doc.undo.text(self.doc.undo.count() - 2), "Paste")
-        # pasted block should now be somewhere right of centre
-        found = any(rgb(self.px(x, 75)) == (0, 255, 0) for x in range(130, 170))
-        self.assertTrue(found)
+        self.assertEqual(L.offset, QPoint(0, 0))          # pasted in place over the selection
+        self.w.A["deselect"].trigger()
+        self.drag((5, 5), (105, 55))                       # Move tool drags the whole layer
+        self.assertEqual(L.offset, QPoint(100, 50))
+        self.assertEqual(rgb(self.px(105, 55)), (0, 255, 0))
+        self.assertEqual(self.doc.undo.text(self.doc.undo.count() - 1), "Move")
+        self.w.undo()
+        self.assertEqual(L.offset, QPoint(0, 0))
+        self.w.undo()
+        self.w.undo()                                      # undo the paste itself
+        self.assertEqual(len(self.doc.layers), 1)
 
-    def test_undo_while_pasting_cancels_paste(self):
-        img = QImage(10, 10, QImage.Format.Format_ARGB32)
-        img.fill(QColor(9, 9, 9))
-        QGuiApplication.clipboard().setImage(img)
-        n = self.doc.undo.count()
-        self.w.paste()
-        self.w.A["undo"].trigger()
-        self.assertIsNone(self.doc.floating)
-        self.assertEqual(self.doc.undo.count(), n)
-        self.assertEqual(rgb(self.px(100, 75)), (255, 255, 255))
+    def test_copy_merged_vs_copy(self):
+        self.doc.fill(QColor(255, 0, 0))
+        L = self.doc.add_layer("Top", self._solid(20, 20, QColor(0, 0, 255)), QPoint(0, 0))
+        self.doc.set_active(self.doc.layers[0])
+        img = self.w.copy()
+        self.assertEqual(rgb(img.pixelColor(5, 5)), (255, 0, 0))        # current layer only
+        img = self.w.copy(merged=True)
+        self.assertEqual(rgb(img.pixelColor(5, 5)), (0, 0, 255))        # everything visible
 
     def test_paste_without_document_creates_one(self):
         while self.w.docs.count():
@@ -388,8 +392,12 @@ class TestMoveAndPaste(Base):
         self.w.paste()
         d = self.w.current_doc()
         self.assertEqual((d.width, d.height), (64, 32))
-        d.commit_floating()
         self.assertEqual(rgb(d.image.pixelColor(5, 5)), (200, 10, 10))
+
+    def _solid(self, w, h, c):
+        img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(c)
+        return img
 
 
 class TestImageOps(Base):
@@ -480,30 +488,132 @@ class TestOtherTools(Base):
         if self._testMethodName.startswith("test_text") and not _env.fonts_available():
             self.skipTest("Qt found no fonts in the test environment, so text can't be drawn")
 
-    def test_text_commit_and_undo(self):
-        t = self.tool("text", size=40)
-        t.commit_text(self.doc, QPointF(20, 80), "Hi")
-        dark = sum(1 for x in range(20, 80) for y in range(40, 85) if self.px(x, y).red() < 128)
-        self.assertGreater(dark, 50)
-        self.assertTrue(self.doc.undo.text(0).startswith("Type"))
-        self.w.undo()
-        dark = sum(1 for x in range(20, 80) for y in range(40, 85) if self.px(x, y).red() < 128)
-        self.assertEqual(dark, 0)
+    def type_text(self, text):
+        for ch in text:
+            if ch == "\n":
+                QTest.keyClick(self.cv, Qt.Key.Key_Return)
+            else:
+                QTest.keyClicks(self.cv, ch)
+        app.processEvents()
 
-    def test_text_tool_click_with_dialog(self):
-        orig = dialogs.TextDialog.exec
+    def dark_pixels(self, x0, y0, x1, y1):
+        return sum(1 for x in range(x0, x1) for y in range(y0, y1) if self.px(x, y).red() < 128)
 
-        def fake_exec(dlg):
-            dlg.edit.setPlainText("Lumen")
-            return 1
-        dialogs.TextDialog.exec = fake_exec
-        try:
-            self.tool("text", size=30)
-            self.click((10, 60))
-        finally:
-            dialogs.TextDialog.exec = orig
-        self.assertIsNone(self.doc.preview)
+    def test_type_on_canvas_creates_type_layer(self):
+        self.tool("text", size=40)
+        self.click((20, 80))
+        s = self.w.ctx.tools["text"].session
+        self.assertIsNotNone(s)
+        self.type_text("Hi B")                 # letters must not trigger tool shortcuts (B = brush)
+        self.assertEqual(self.w.ctx.tool.name, "text")
+        self.assertEqual(s.td.text, "Hi B")
+        self.assertGreater(self.dark_pixels(20, 45, 110, 90), 50)   # visible live, on the image
+        self.key(Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+        self.assertIsNone(self.w.ctx.tools["text"].session)
+        self.assertEqual(len(self.doc.layers), 2)
+        L = self.doc.active
+        self.assertTrue(L.is_text)
+        self.assertEqual(L.name, "Hi B")
         self.assertEqual(self.doc.undo.count(), 1)
+        self.w.undo()
+        self.assertEqual(len(self.doc.layers), 1)
+        self.assertEqual(self.dark_pixels(20, 45, 110, 90), 0)
+        self.w.redo()
+        self.assertGreater(self.dark_pixels(20, 45, 110, 90), 50)
+
+    def test_type_editing_keys(self):
+        self.tool("text", size=30)
+        self.click((10, 60))
+        s = self.w.ctx.tools["text"].session
+        self.type_text("abc\ndef")
+        self.assertEqual(s.td.text, "abc\ndef")
+        self.key(Qt.Key.Key_Backspace)
+        self.key(Qt.Key.Key_Left)
+        self.type_text("X")
+        self.assertEqual(s.td.text, "abc\ndXe")
+        self.key(Qt.Key.Key_Up)
+        self.key(Qt.Key.Key_Home)
+        self.type_text("Z")
+        self.assertEqual(s.td.text, "Zabc\ndXe")
+        self.key(Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
+        self.type_text("new")
+        self.assertEqual(s.td.text, "new")
+        self.key(Qt.Key.Key_Escape)                 # Esc cancels a brand-new type layer
+        self.assertEqual(len(self.doc.layers), 1)
+        self.assertEqual(self.doc.undo.count(), 0)
+
+    def test_edit_existing_type_layer_and_move_it(self):
+        self.tool("text", size=40)
+        self.click((20, 80))
+        self.type_text("Hello")
+        self.key(Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+        L = self.doc.active
+        # click on the existing text with the Type tool -> edits it (no new layer)
+        self.click((40, 70))
+        s = self.w.ctx.tools["text"].session
+        self.assertIs(s.layer, L)
+        self.key(Qt.Key.Key_End)
+        self.type_text("!")
+        self.key(Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+        self.assertEqual(L.text.text, "Hello!")
+        self.assertEqual(L.name, "Hello!")
+        self.assertEqual(len(self.doc.layers), 2)
+        self.w.undo()
+        self.assertEqual(L.text.text, "Hello")
+        self.w.redo()
+        # Move tool moves the type layer and it stays editable
+        self.tool("move")
+        before = self.dark_pixels(20, 45, 150, 90)
+        self.drag((40, 70), (40, 120))
+        self.assertTrue(L.is_text)
+        self.assertEqual(self.dark_pixels(20, 45, 150, 90), 0)
+        self.assertGreater(self.dark_pixels(20, 95, 150, 140), before // 2)
+        self.tool("text")
+        self.click((40, 120))
+        self.assertIs(self.w.ctx.tools["text"].session.layer, L)
+
+    def test_options_bar_changes_selected_type_layer(self):
+        t = self.tool("text", size=20)
+        self.click((20, 80))
+        self.type_text("Size")
+        self.key(Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+        L = self.doc.active
+        w0 = L.rect().width()
+        t._style_changed(size=60)                    # nothing being typed: applies to the type layer
+        self.assertEqual(L.text.size, 60)
+        self.assertGreater(L.rect().width(), w0 * 2)
+        self.assertEqual(self.doc.undo.text(self.doc.undo.count() - 1), "Character Settings")
+        t._style_changed(color=QColor(255, 0, 0))
+        self.assertEqual(L.text.color.name(), "#ff0000")
+
+    def test_click_outside_commits_and_switching_tools_commits(self):
+        self.tool("text", size=30)
+        self.click((10, 50))
+        self.type_text("One")
+        self.click((150, 140))                       # outside the text box: commit only
+        self.assertIsNone(self.w.ctx.tools["text"].session)
+        self.assertEqual(len(self.doc.layers), 2)
+        self.click((150, 140))                       # next click starts a new one
+        self.type_text("Two")
+        self.w.set_tool("brush")                     # switching tools commits
+        self.assertEqual(len(self.doc.layers), 3)
+
+    def test_painting_on_type_layer_asks_to_rasterize(self):
+        self.tool("text", size=30)
+        self.click((10, 50))
+        self.type_text("Ras")
+        self.key(Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+        L = self.doc.active
+        asked = []
+        self.doc.confirm = lambda kind, layer: asked.append(kind) or False
+        self.tool("brush", size=10, hardness=100)
+        self.drag((10, 140), (100, 140))
+        self.assertEqual(asked, ["rasterize"])
+        self.assertTrue(L.is_text)                   # declined: nothing happened
+        self.doc.confirm = lambda kind, layer: True
+        self.drag((10, 140), (100, 140))
+        self.assertFalse(L.is_text)
+        self.assertEqual(rgb(self.px(50, 140)), (0, 0, 0))
 
     def test_zoom_tool_and_view(self):
         self.tool("zoom", out=False)
@@ -549,17 +659,13 @@ class TestOtherTools(Base):
         self.assertEqual(self.doc.undo.count(), 0)  # panning painted nothing
 
     def test_every_tool_survives_mouse_input(self):
-        orig = dialogs.TextDialog.exec
-        dialogs.TextDialog.exec = lambda dlg: 0
-        try:
-            for name in self.w.ctx.tools:
-                self.tool(name)
-                self.drag((30, 30), (80, 60), (120, 40))
-                self.cv.grab()  # exercise overlay painting
-                self.key(Qt.Key.Key_Escape)
-                self.w.set_tool("brush")
-        finally:
-            dialogs.TextDialog.exec = orig
+        self.doc.add_layer("Second", None)
+        for name in self.w.ctx.tools:
+            self.tool(name)
+            self.drag((30, 30), (80, 60), (120, 40))
+            self.cv.grab()  # exercise overlay painting
+            self.key(Qt.Key.Key_Escape)
+            self.w.set_tool("brush")
 
 
 class TestAppShell(Base):
@@ -723,6 +829,300 @@ class TestAppShell(Base):
         self.assertEqual(self.w.info.vals["R"].text(), "255")
 
 
+class TestLayers(Base):
+    def solid(self, w, h, c):
+        img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(c)
+        return img
+
+    def test_new_document_has_background_and_new_layer(self):
+        d = self.doc
+        self.assertEqual([L.name for L in d.layers], ["Background"])
+        self.assertTrue(d.layers[0].background)
+        self.w.A["new_layer_quick"].trigger()
+        self.assertEqual([L.name for L in d.layers], ["Background", "Layer 1"])
+        self.assertIs(d.active, d.layers[1])
+        self.w.undo()
+        self.assertEqual(len(d.layers), 1)
+
+    def test_paint_goes_to_active_layer_only(self):
+        d = self.doc
+        top = d.add_layer()
+        self.tool("brush", size=10, hardness=100)
+        self.drag((20, 20), (150, 20))
+        self.assertEqual(rgb(self.px(80, 20)), (0, 0, 0))
+        self.assertEqual(top.alpha_at(QPoint(80, 20)), 255)
+        self.assertEqual(rgb(d.layers[0].image.pixelColor(80, 20)), (255, 255, 255))   # background untouched
+        d.toggle_visible(top)
+        self.assertEqual(rgb(self.px(80, 20)), (255, 255, 255))
+        d.toggle_visible(top)
+        self.assertEqual(rgb(self.px(80, 20)), (0, 0, 0))
+
+    def test_eraser_on_layer_makes_transparent(self):
+        d = self.doc
+        L = d.add_layer("Red", self.solid(200, 150, QColor(255, 0, 0)))
+        self.tool("eraser", size=10, hardness=100)
+        self.drag((20, 50), (150, 50))
+        self.assertEqual(L.alpha_at(QPoint(80, 50)), 0)
+        self.assertEqual(rgb(self.px(80, 50)), (255, 255, 255))   # background shows through
+
+    def test_opacity_fill_and_blend_modes(self):
+        d = self.doc
+        d.fill(QColor(200, 100, 50))
+        L = d.add_layer("Top", self.solid(200, 150, QColor(100, 100, 100)))
+        d.set_props(L, "Blending Change", blend="mul ")
+        self.assertTrue(near(rgb(self.px(5, 5)), (78, 39, 20), 2))           # multiply
+        d.set_props(L, "Blending Change", blend="scrn")
+        self.assertTrue(near(rgb(self.px(5, 5)), (222, 161, 131), 2))        # screen
+        d.set_props(L, "Blending Change", blend="norm", opacity=50)
+        self.assertTrue(near(rgb(self.px(5, 5)), (150, 100, 75), 2))
+        d.set_props(L, "Fill", opacity=100, fill=0)
+        self.assertEqual(rgb(self.px(5, 5)), (200, 100, 50))
+        d.set_props(L, "Fill", fill=100)
+        from lumen.layers import BLEND_KEYS
+        for key in BLEND_KEYS:                                              # every mode renders
+            d.set_props(L, "Blend", blend=key)
+            c = self.px(5, 5)
+            self.assertEqual(c.alpha(), 255, key)
+        d.set_props(L, "Blend", blend="lum ")                               # grey luminosity onto colour
+        r, g, b = rgb(self.px(5, 5))
+        self.assertTrue(abs((r * .3 + g * .59 + b * .11) - 100) < 3)
+
+    def test_reorder_duplicate_delete_merge_flatten(self):
+        d = self.doc
+        a = d.add_layer("A", self.solid(50, 50, QColor(255, 0, 0)))
+        b = d.add_layer("B", self.solid(50, 50, QColor(0, 0, 255)), QPoint(25, 0))
+        self.assertEqual(rgb(self.px(30, 10)), (0, 0, 255))
+        self.w.A["backward"].trigger()                       # Ctrl+[ : B below A
+        self.assertEqual([L.name for L in d.layers], ["Background", "B", "A"])
+        self.assertEqual(rgb(self.px(30, 10)), (255, 0, 0))
+        self.w.A["backward"].trigger()                       # can't go below the Background
+        self.assertEqual(d.layers[0].name, "Background")
+        d.set_active(a)
+        self.w.A["dup_layer"].trigger()
+        self.assertEqual(d.active.name, "A copy")
+        self.w.A["del_layer"].trigger()
+        self.assertEqual(len(d.layers), 3)
+        d.set_active(a)
+        self.w.A["merge_down"].trigger()                     # A into B
+        self.assertEqual([L.name for L in d.layers], ["Background", "B"])
+        self.assertEqual(rgb(self.px(30, 10)), (255, 0, 0))
+        self.assertEqual(rgb(self.px(60, 10)), (0, 0, 255))
+        self.w.A["flatten"].trigger()
+        self.assertEqual(len(d.layers), 1)
+        self.assertTrue(d.layers[0].background)
+        self.assertEqual(rgb(self.px(30, 10)), (255, 0, 0))
+        for _ in range(5):
+            self.w.undo()
+        self.assertEqual([L.name for L in d.layers], ["Background", "A", "B"])
+
+    def test_layer_via_copy_and_cut(self):
+        d = self.doc
+        d.fill(QColor(0, 200, 0))
+        p = QPainterPath()
+        p.addRect(QRectF(10, 10, 30, 20))
+        d.set_selection(p)
+        self.w.A["via_copy"].trigger()
+        self.assertEqual(d.active.name, "Layer 1")
+        self.assertEqual(d.active.rect(), QRect(10, 10, 30, 20))
+        d.set_active(d.layers[0])
+        d.set_selection(p)
+        self.w.A["via_cut"].trigger()
+        self.assertEqual(rgb(d.layers[0].image.pixelColor(15, 15)), (255, 255, 255))   # cut leaves bg colour
+        self.assertEqual(rgb(self.px(15, 15)), (0, 200, 0))
+
+    def test_background_rules_and_conversion(self):
+        d = self.doc
+        bg = d.layers[0]
+        self.tool("move")
+        self.drag((50, 50), (90, 50))
+        self.assertEqual(bg.offset, QPoint(0, 0))                    # locked position
+        self.assertEqual(d.undo.count(), 0)
+        d.background_to_layer()
+        self.assertFalse(bg.background)
+        self.assertEqual(bg.name, "Layer 0")
+        self.drag((50, 50), (90, 50))
+        self.assertEqual(bg.offset, QPoint(40, 0))
+        self.assertEqual(self.px(10, 10).alpha(), 0)                 # transparency revealed
+        self.tool("eraser", size=10)
+        self.drag((100, 100), (120, 100))
+        self.assertEqual(self.px(110, 100).alpha(), 0)
+
+    def test_locks(self):
+        d = self.doc
+        L = d.add_layer("Shape", self.solid(40, 40, QColor(255, 0, 0)), QPoint(10, 10))
+        d.set_props(L, "Lock", lock_alpha=True)
+        self.tool("brush", size=30, hardness=100)
+        self.drag((5, 30), (100, 30))
+        self.assertEqual(rgb(self.px(30, 30)), (0, 0, 0))            # painted inside existing pixels
+        self.assertEqual(L.alpha_at(QPoint(70, 30)), 0)              # but not outside them
+        d.set_props(L, "Lock", lock_alpha=False, lock_pixels=True)
+        n = d.undo.count()
+        self.drag((5, 40), (100, 40))
+        self.assertEqual(d.undo.count(), n)
+        d.set_props(L, "Lock", lock_pixels=False, lock_position=True)
+        self.tool("move")
+        before = QPoint(L.offset)
+        self.drag((30, 30), (60, 60))
+        self.assertEqual(L.offset, before)
+
+    def test_auto_select_and_ctrl_click_pick_layer(self):
+        d = self.doc
+        a = d.add_layer("A", self.solid(40, 40, QColor(255, 0, 0)), QPoint(0, 0))
+        b = d.add_layer("B", self.solid(40, 40, QColor(0, 0, 255)), QPoint(100, 100))
+        self.tool("move", auto_select=False)
+        self.drag((10, 10), (20, 10), mods=Qt.KeyboardModifier.ControlModifier)
+        self.assertIs(d.active, a)
+        self.assertEqual(a.offset, QPoint(10, 0))
+        self.tool("move", auto_select=True)
+        self.drag((110, 110), (110, 120))
+        self.assertIs(d.active, b)
+        self.assertEqual(b.offset, QPoint(100, 110))
+
+    def test_number_keys_set_opacity(self):
+        d = self.doc
+        L = d.add_layer("A", self.solid(40, 40, QColor(255, 0, 0)))
+        self.tool("move")
+        self.key(Qt.Key.Key_5)
+        self.assertEqual(L.opacity, 50)
+        b = self.tool("brush")
+        self.cv._digit = None
+        self.key(Qt.Key.Key_3)
+        self.assertEqual(b.opts["opacity"], 30)
+
+    def test_load_selection_from_layer(self):
+        d = self.doc
+        L = d.add_layer("A", self.solid(30, 20, QColor(255, 0, 0)), QPoint(15, 25))
+        d.select_layer_pixels(L)
+        self.assertEqual(d.selection_bounds(), QRect(15, 25, 30, 20))
+
+    def test_filters_and_fill_apply_to_active_layer(self):
+        d = self.doc
+        L = d.add_layer("A", self.solid(200, 150, QColor(10, 20, 30)))
+        self.w.A["invert"].trigger()
+        self.assertEqual(rgb(L.image.pixelColor(5, 5)), (245, 235, 225))
+        self.assertEqual(rgb(d.layers[0].image.pixelColor(5, 5)), (255, 255, 255))
+
+    def test_crop_resize_rotate_keep_layers(self):
+        d = self.doc
+        a = d.add_layer("A", self.solid(20, 20, QColor(255, 0, 0)), QPoint(100, 50))
+        self.w.resize_canvas(d, 300, 150, (0, 1), 2)                 # anchor left
+        self.assertEqual(len(d.layers), 2)
+        self.assertEqual(a.rect(), QRect(100, 50, 20, 20)) if a in d.layers else None
+        self.assertEqual(rgb(self.px(110, 60)), (255, 0, 0))
+        self.w.resize_image(d, 150, 75, True)
+        self.assertEqual((d.width, d.height), (150, 75))
+        self.assertTrue(near(rgb(self.px(55, 30)), (255, 0, 0), 3))
+        self.w.A["rot90"].trigger()
+        self.assertEqual((d.width, d.height), (75, 150))
+        self.assertEqual(len(d.layers), 2)
+        self.assertTrue(near(rgb(self.px(75 - 30, 55)), (255, 0, 0), 3))
+        crop = QRect(30, 40, 30, 30)
+        from lumen.tools import crop_document
+        crop_document(d, crop)
+        self.assertEqual((d.width, d.height), (30, 30))
+        for _ in range(4):
+            self.w.undo()
+        self.assertEqual((d.width, d.height), (200, 150))
+        self.assertEqual(d.layers[1].rect(), QRect(100, 50, 20, 20))
+
+    def test_shape_tool_makes_new_layer(self):
+        self.tool("rect", fill=True, stroke=False, pixels=0)
+        self.drag((20, 20), (80, 60))
+        self.assertEqual(len(self.doc.layers), 2)
+        self.assertEqual(self.doc.active.name, "Rectangle 1")
+        self.tool("rect", fill=True, stroke=False, pixels=1)
+        self.drag((100, 20), (150, 60))
+        self.assertEqual(len(self.doc.layers), 2)
+
+    def test_layers_panel_interactions(self):
+        d = self.doc
+        a = d.add_layer("A", self.solid(40, 40, QColor(255, 0, 0)))
+        b = d.add_layer("B", self.solid(40, 40, QColor(0, 0, 255)))
+        lst = self.w.layers_panel.list
+        lst.resize(260, 400)
+        from lumen.layerspanel import ROW_H, EYE_W
+        def click(row, x=120, mods=Qt.KeyboardModifier.NoModifier, button=L):
+            pos = QPointF(x, row * ROW_H + ROW_H / 2)
+            QApplication.sendEvent(lst, QMouseEvent(QEvent.Type.MouseButtonPress, pos, pos, button, button, mods))
+            QApplication.sendEvent(lst, QMouseEvent(QEvent.Type.MouseButtonRelease, pos, pos, button, NONE, mods))
+        self.assertEqual([x.name for x in lst.rows()], ["B", "A", "Background"])
+        click(1)
+        self.assertIs(d.active, a)
+        click(0, x=EYE_W // 2)
+        self.assertFalse(b.visible)
+        # drag A above B
+        start = QPointF(120, 1 * ROW_H + 10)
+        end = QPointF(120, 0 * ROW_H + 2)
+        QApplication.sendEvent(lst, QMouseEvent(QEvent.Type.MouseButtonPress, start, start, L, L, NOMOD))
+        QApplication.sendEvent(lst, QMouseEvent(QEvent.Type.MouseMove, end, end, NONE, L, NOMOD))
+        QApplication.sendEvent(lst, QMouseEvent(QEvent.Type.MouseButtonRelease, end, end, L, NONE, NOMOD))
+        self.assertEqual([x.name for x in d.layers], ["Background", "B", "A"])
+        # opacity/blend from the panel
+        self.w.layers_panel.opacity.setValue(40)
+        self.assertEqual(a.opacity, 40)
+        self.w.layers_panel.opacity.setValue(30)
+        self.assertEqual(d.undo.text(d.undo.count() - 1), "Opacity Change")
+        n = d.undo.count()
+        self.w.layers_panel.opacity.setValue(20)
+        self.assertEqual(d.undo.count(), n)                            # slider drags merge into one step
+        i = self.w.layers_panel.blend.findData("mul ")
+        self.w.layers_panel.blend.setCurrentIndex(i)
+        self.w.layers_panel._blend_chosen(i)
+        self.assertEqual(a.blend, "mul ")
+        # rename
+        lst.start_rename(0, a)
+        lst._editor[0].setText("Renamed")
+        lst._close_editor(True)
+        self.assertEqual(a.name, "Renamed")
+        lst.grab()
+
+    def test_psd_roundtrip_keeps_layers_and_text(self):
+        d = self.doc
+        d.fill(QColor(240, 240, 240))
+        a = d.add_layer("Red", self.solid(60, 40, QColor(255, 0, 0, 160)), QPoint(30, 20))
+        d.set_props(a, "x", blend="mul ", opacity=80)
+        if _env.fonts_available():
+            self.tool("text", size=30)
+            self.click((20, 120))
+            QTest.keyClicks(self.cv, "PSD")
+            self.key(Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+        path = os.path.join(tempfile.mkdtemp(), "layers.psd")
+        orig = self.w._ask_path
+        self.w._ask_path = lambda doc, title: path
+        try:
+            self.assertTrue(self.w.save_as(d))
+        finally:
+            self.w._ask_path = orig
+        d.path = None
+        cv2 = self.w.open_path(path)
+        d2 = cv2.doc
+        self.assertEqual([L.name for L in d2.layers], [L.name for L in d.layers])
+        self.assertTrue(d2.layers[0].background)
+        self.assertEqual(d2.layers[1].blend, "mul ")
+        self.assertEqual(d2.layers[1].opacity, 80)
+        if _env.fonts_available():
+            self.assertTrue(d2.layers[2].is_text)
+            self.assertEqual(d2.layers[2].text.text, "PSD")
+        import numpy as np
+        diff = np.abs(imageops.straight_array(d.composite()).astype(int)
+                      - imageops.straight_array(d2.composite()).astype(int)).max()
+        self.assertLessEqual(diff, 1)
+
+    def test_save_layered_as_png_goes_to_save_as_psd(self):
+        d = self.doc
+        d.add_layer("A", self.solid(10, 10, QColor(255, 0, 0)))
+        d.path = os.path.join(tempfile.mkdtemp(), "x.png")
+        asked = []
+        orig = self.w.save_as
+        self.w.save_as = lambda doc=None: asked.append(1) or False
+        try:
+            self.w.save(d)
+        finally:
+            self.w.save_as = orig
+        self.assertEqual(asked, [1])
+
+
 class TestViewFit(Base):
     def test_large_image_opens_fitted(self):
         cv = self.w.create_document(5000, 4000)
@@ -734,6 +1134,21 @@ class TestViewFit(Base):
 
 
 class TestPerformance(Base):
+    def test_stroke_speed_with_many_layers(self):
+        cv = self.w.create_document(3000, 2000)
+        self.cv, self.doc = cv, cv.doc
+        app.processEvents()
+        for i in range(6):
+            img = QImage(3000, 2000, QImage.Format.Format_ARGB32_Premultiplied)
+            img.fill(QColor(i * 30, 100, 200, 60))
+            L = self.doc.add_layer(f"L{i}", img)
+            self.doc.set_props(L, "b", blend=["norm", "mul ", "scrn", "over", "sLit", "colr"][i])
+        self.tool("brush", size=80, hardness=0)
+        t0 = time.time()
+        self.drag((100, 100), (2900, 1900), steps=40)
+        dt = time.time() - t0
+        self.assertLess(dt, 12.0, f"layered stroke too slow: {dt:.2f}s")
+
     def test_big_brush_stroke_speed(self):
         cv = self.w.create_document(4000, 3000)
         self.cv, self.doc = cv, cv.doc

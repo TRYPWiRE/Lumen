@@ -42,6 +42,7 @@ class Canvas(QAbstractScrollArea):
         vp = self.viewport()
         vp.setMouseTracking(True)
         vp.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
+        self.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled)
         vp.setAutoFillBackground(False)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -175,7 +176,7 @@ class Canvas(QAbstractScrollArea):
             self.viewport().update(self.img_rect_to_view(QRectF(rect)).toAlignedRect().adjusted(-2, -2, 2, 2))
 
     def _tick_ants(self):
-        if self.doc.has_selection() or self.doc.floating:
+        if self.doc.has_selection() or self.doc.floating or self.doc.editing_text is not None:
             self._ant_offset = (self._ant_offset + 1) % 8
             self.viewport().update()
 
@@ -204,11 +205,7 @@ class Canvas(QAbstractScrollArea):
             p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, z < 1)
             p.translate(o)
             p.scale(z, z)
-            p.drawImage(QRectF(src), self.doc.display_image(), QRectF(src))
-            f = self.doc.floating
-            if f:
-                p.setClipRect(QRectF(self.doc.rect()))
-                p.drawImage(f.pos, f.image)
+            p.drawImage(QRectF(src), self.doc.composite(), QRectF(src))
             p.restore()
 
             if z >= 8:
@@ -222,6 +219,13 @@ class Canvas(QAbstractScrollArea):
         if tool is not None:
             p.save()
             tool.paint_overlay(p, self)
+            p.restore()
+        for fn in list(getattr(self.ctx, "canvas_overlays", [])):   # extension overlays
+            p.save()
+            try:
+                fn(p, self)
+            except Exception as e:  # never let an extension break painting
+                self.ctx.status.emit(f"Canvas overlay error: {e}")
             p.restore()
             if self.mouse_view is not None and getattr(tool, "brush_outline", False):
                 self._draw_brush_cursor(p, tool)
@@ -355,9 +359,25 @@ class Canvas(QAbstractScrollArea):
             return
         super().wheelEvent(ev)
 
-    def keyPressEvent(self, ev):
-        if ev.key() == Qt.Key.Key_Space and not ev.isAutoRepeat():
+    def event(self, ev):
+        # While typing on the canvas, letters must reach the Type tool instead of tool shortcuts.
+        if ev.type() == QEvent.Type.ShortcutOverride:
             tool = self.ctx.tool
+            if tool is not None and getattr(tool, "wants_key", None) and tool.wants_key(self, ev):
+                ev.accept()
+                return True
+        return super().event(ev)
+
+    def inputMethodEvent(self, ev):
+        tool = self.ctx.tool
+        if tool is not None and hasattr(tool, "input_method"):
+            tool.input_method(self, ev)
+            return
+        super().inputMethodEvent(ev)
+
+    def keyPressEvent(self, ev):
+        tool = self.ctx.tool
+        if ev.key() == Qt.Key.Key_Space and not ev.isAutoRepeat():
             if not getattr(tool, "active", False) and not getattr(tool, "captures_space", False):
                 self._space = True
                 self.refresh_cursor()
@@ -365,7 +385,35 @@ class Canvas(QAbstractScrollArea):
         tool = self.tool()
         if tool is not None and tool.key_press(self, ev):
             return
+        if self._opacity_key(ev):
+            return
         super().keyPressEvent(ev)
+
+    def _opacity_key(self, ev):
+        """Photoshop: number keys set opacity (tool opacity for painting tools, else layer opacity).
+        1 = 10% … 0 = 100%; two quick digits give an exact value (e.g. 4 then 5 = 45%)."""
+        if ev.modifiers() & ~Qt.KeyboardModifier.KeypadModifier or not ev.text().isdigit():
+            return False
+        import time
+        d = int(ev.text())
+        now = time.monotonic()
+        last = getattr(self, "_digit", None)
+        if last is not None and now - last[1] < 0.6:
+            value = last[0] * 10 + d
+            self._digit = None
+            value = 100 if value == 0 else value
+        else:
+            value = 100 if d == 0 else d * 10
+            self._digit = (d, now)
+        tool = self.ctx.tool
+        if tool is not None and "opacity" in tool.opts and getattr(tool, "brush_outline", False):
+            tool.set_opt("opacity", value)
+            self.ctx.status.emit(f"{tool.title}: opacity {value}%")
+        else:
+            L = self.doc.active
+            if L is not None and not L.background:
+                self.doc.set_props(L, "Opacity Change", merge_key="opacity", opacity=value)
+        return True
 
     def keyReleaseEvent(self, ev):
         if ev.key() == Qt.Key.Key_Space and not ev.isAutoRepeat() and self._space:
@@ -393,6 +441,6 @@ class Canvas(QAbstractScrollArea):
         x, y = math.floor(ip.x()), math.floor(ip.y())
         if self.doc.rect().contains(x, y):
             from . import imageops
-            c = imageops.sample(self.doc.flattened(), x, y, 1)
+            c = imageops.sample(self.doc.composite(), x, y, 1)
             if c.alpha() > 0:
                 self.ctx.set_fg(c)

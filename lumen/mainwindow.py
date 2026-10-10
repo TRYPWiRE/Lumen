@@ -16,14 +16,19 @@ from .canvas import Canvas
 from .tools import TOOL_CLASSES, TOOL_GROUPS, crop_document
 from .colors import FgBgWidget, ColorPanel, SwatchesPanel
 from .panels import PanelGroup, NavigatorPanel, InfoPanel, HistoryPanel
+from .layerspanel import LayersPanel
+from .layers import Layer
+from . import psd
 from .dialogs import NewDocumentDialog, ImageSizeDialog, CanvasSizeDialog, QualityDialog
 from . import config, updates, versioning
 from .extensions import ExtensionManager, ExtensionError
 from .extensions.api import ExtensionAPI
 from .extensions.manager_ui import UpdateBanner, ExtensionsDialog
 
-OPEN_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.ico *.ppm *.pgm *.pbm *.xpm);;All Files (*)"
+OPEN_FILTER = ("All Formats (*.psd *.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.ico *.ppm *.pgm *.pbm *.xpm);;"
+               "Photoshop (*.psd);;Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff);;All Files (*)")
 SAVE_FILTERS = {
+    "Photoshop (*.psd)": "psd",
     "PNG (*.png)": "png",
     "JPEG (*.jpg *.jpeg)": "jpg",
     "WebP (*.webp)": "webp",
@@ -269,13 +274,17 @@ class MainWindow(QMainWindow):
         self.group_nav = PanelGroup()
         self.group_nav.addTab(self.navigator, "Navigator")
         self.group_nav.addTab(self.info, "Info")
-        self.group_hist = PanelGroup()
-        self.group_hist.addTab(self.history, "History")
+        self.group_nav.addTab(self.history, "History")
+        self.group_hist = self.group_nav           # extensions' panels are added here too
+        self.layers_panel = LayersPanel(self)
+        self.layers_panel.editTextRequested.connect(self.edit_type_layer)
+        self.group_layers = PanelGroup()
+        self.group_layers.addTab(self.layers_panel, "Layers")
         self.panels = QSplitter(Qt.Orientation.Vertical)
         self.panels.addWidget(self.group_color)
         self.panels.addWidget(self.group_nav)
-        self.panels.addWidget(self.group_hist)
-        self.panels.setSizes([250, 230, 300])
+        self.panels.addWidget(self.group_layers)
+        self.panels.setSizes([230, 200, 420])
         self.panels.setChildrenCollapsible(False)
         self.panels.setMinimumWidth(250)
 
@@ -347,6 +356,7 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         A["cut"] = self._act(m, "Cut", self.cut, "Ctrl+X")
         A["copy"] = self._act(m, "Copy", self.copy, "Ctrl+C")
+        A["copy_merged"] = self._act(m, "Copy Merged", lambda: self.copy(merged=True), "Shift+Ctrl+C")
         A["paste"] = self._act(m, "Paste", self.paste, "Ctrl+V")
         A["clear"] = self._act(m, "Clear", self.clear, ["Delete", "Backspace"])
         m.addSeparator()
@@ -375,10 +385,45 @@ class MainWindow(QMainWindow):
                                lambda: self._transform("Flip Canvas Vertical", QTransform().scale(1, -1)))
         A["crop_sel"] = self._act(m, "Crop to Selection", self.crop_to_selection)
 
+        m = mb.addMenu("&Layer")
+        new = m.addMenu("New")
+        A["new_layer"] = self._act(new, "Layer…", self.new_layer_dialog, "Shift+Ctrl+N")
+        A["new_layer_quick"] = self._act(None, "New Layer", lambda: self._doc_call("add_layer"), "Shift+Ctrl+Alt+N")
+        A["layer_from_bg"] = self._act(new, "Layer from Background", lambda: self._doc_call("background_to_layer"))
+        A["bg_from_layer"] = self._act(new, "Background from Layer", lambda: self._doc_call("layer_to_background"))
+        new.addSeparator()
+        A["via_copy"] = self._act(new, "Layer via Copy", lambda: self._doc_call("layer_via_copy"), "Ctrl+J")
+        A["via_cut"] = self._act(new, "Layer via Cut", lambda: self._doc_call("layer_via_copy", True), "Shift+Ctrl+J")
+        A["dup_layer"] = self._act(m, "Duplicate Layer", lambda: self._doc_call("duplicate_layer"))
+        A["del_layer"] = self._act(m, "Delete Layer", lambda: self._doc_call("delete_layer"))
+        A["rename_layer"] = self._act(m, "Rename Layer…", self.rename_layer)
+        m.addSeparator()
+        ras = m.addMenu("Rasterize")
+        A["rasterize"] = self._act(ras, "Type", lambda: self._doc_call("rasterize_layer"))
+        A["select_pixels"] = self._act(m, "Select Layer Pixels",
+                                       lambda: self.current_doc() and self.current_doc().select_layer_pixels(
+                                           self.current_doc().active))
+        m.addSeparator()
+        arr = m.addMenu("Arrange")
+        A["front"] = self._act(arr, "Bring to Front", lambda: self._doc_call("arrange", "front"), "Shift+Ctrl+]")
+        A["forward"] = self._act(arr, "Bring Forward", lambda: self._doc_call("arrange", "forward"), "Ctrl+]")
+        A["backward"] = self._act(arr, "Send Backward", lambda: self._doc_call("arrange", "backward"), "Ctrl+[")
+        A["back"] = self._act(arr, "Send to Back", lambda: self._doc_call("arrange", "back"), "Shift+Ctrl+[")
+        A["sel_above"] = self._act(None, "Select Layer Above", lambda: self._doc_call("select_relative", 1), "Alt+]")
+        A["sel_below"] = self._act(None, "Select Layer Below", lambda: self._doc_call("select_relative", -1), "Alt+[")
+        m.addSeparator()
+        A["merge_down"] = self._act(m, "Merge Down", lambda: self._doc_call("merge_down"), "Ctrl+E")
+        A["merge_visible"] = self._act(m, "Merge Visible", lambda: self._doc_call("merge_visible"), "Shift+Ctrl+E")
+        A["flatten"] = self._act(m, "Flatten Image", lambda: self._doc_call("flatten_image"))
+
         m = mb.addMenu("&Select")
         A["sel_all"] = self._act(m, "All", lambda: self._doc_call("select_all"), "Ctrl+A")
         A["deselect"] = self._act(m, "Deselect", lambda: self._doc_call("deselect"), "Ctrl+D")
         A["sel_inv"] = self._act(m, "Inverse", lambda: self._doc_call("invert_selection"), "Shift+Ctrl+I")
+        m.addSeparator()
+        A["load_sel"] = self._act(m, "Load Selection from Layer",
+                                  lambda: self.current_doc() and self.current_doc().select_layer_pixels(
+                                      self.current_doc().active))
 
         m = mb.addMenu("Fil&ter")
         A["last_filter"] = self._act(m, "Last Filter", self.repeat_last_filter, "Ctrl+Alt+F")
@@ -395,10 +440,10 @@ class MainWindow(QMainWindow):
 
         m = mb.addMenu("&Window")
         window_menu = m
-        for text, grp, page in (("Color", self.group_color, 0), ("Swatches", self.group_color, 1),
-                                ("Navigator", self.group_nav, 0), ("Info", self.group_nav, 1),
-                                ("History", self.group_hist, 0)):
-            self._act(m, text, lambda _, g=grp, i=page: (self.panels.show(), g.setCurrentIndex(i)))
+        for text, grp, page, key in (("Color", self.group_color, 0, "F6"), ("Swatches", self.group_color, 1, None),
+                                     ("History", self.group_nav, 2, None), ("Info", self.group_nav, 1, "F8"),
+                                     ("Layers", self.group_layers, 0, "F7"), ("Navigator", self.group_nav, 0, None)):
+            self._act(m, text, lambda _, g=grp, i=page: (self.panels.show(), g.setCurrentIndex(i)), key)
         m.addSeparator()
         A["panels"] = self._act(m, "Show Panels", self.toggle_panels, "Tab", checkable=True)
         A["panels"].setChecked(True)
@@ -513,6 +558,12 @@ class MainWindow(QMainWindow):
 
     def add_document(self, doc: Document):
         doc.bg_color = self.ctx.bg
+        doc.confirm = self._confirm_layer_action
+        doc.blocked.connect(lambda msg: self.statusBar().showMessage(msg, 6000))
+        doc.layersChanged.connect(self._update_actions)
+        doc.activeLayerChanged.connect(self._update_actions)
+        doc.layersChanged.connect(lambda: self._emit_ext("layers_changed", doc))
+        doc.changed.connect(lambda r: self._emit_ext("document_changed", doc, r))
         cv = Canvas(doc, self.ctx)
         self.undo_group.addStack(doc.undo)
         cv.zoomChanged.connect(lambda _: self._update_tab_title(cv))
@@ -552,6 +603,7 @@ class MainWindow(QMainWindow):
             self.setWindowTitle("Lumen")
         self.navigator.set_canvas(cv)
         self.info.set_canvas(cv)
+        self.layers_panel.set_document(cv.doc if cv else None)
         self._update_status()
         self._update_actions()
         if self.docs.count() == 0:
@@ -592,15 +644,30 @@ class MainWindow(QMainWindow):
             return
         doc = self.current_doc()
         has = doc is not None
-        for k in ("close", "close_all", "save", "save_as", "export", "cut", "copy", "clear", "fill_fg", "fill_bg",
-                  "invert", "desat", "image_size", "canvas_size", "rot180", "rot90", "rot270", "fliph", "flipv",
-                  "sel_all", "deselect", "sel_inv", "zin", "zout", "fit", "100"):
+        for k in ("close", "close_all", "save", "save_as", "export", "cut", "copy", "copy_merged", "clear", "fill_fg",
+                  "fill_bg", "invert", "desat", "image_size", "canvas_size", "rot180", "rot90", "rot270", "fliph",
+                  "flipv", "sel_all", "deselect", "sel_inv", "zin", "zout", "fit", "100", "new_layer",
+                  "new_layer_quick", "via_copy", "dup_layer", "rename_layer", "select_pixels", "load_sel",
+                  "sel_above", "sel_below", "merge_visible", "flatten"):
             self.A[k].setEnabled(has)
         sel = has and doc.has_selection()
         self.A["crop_sel"].setEnabled(sel)
         self.A["cut"].setEnabled(sel)
-        self.A["clear"].setEnabled(sel)
+        self.A["via_cut"].setEnabled(sel)
         self.A["deselect"].setEnabled(sel)
+        L = doc.active if has else None
+        idx = doc.layers.index(L) if L in (doc.layers if has else []) else -1
+        self.A["del_layer"].setEnabled(has and len(doc.layers) > 1)
+        self.A["layer_from_bg"].setEnabled(bool(L and L.background))
+        self.A["bg_from_layer"].setEnabled(bool(has and doc.background_layer() is None and L and not L.is_text))
+        self.A["rasterize"].setEnabled(bool(L and L.is_text))
+        self.A["merge_down"].setEnabled(idx > 0)
+        movable = bool(L and not L.background)
+        bottom = 1 if has and doc.background_layer() is not None else 0
+        self.A["front"].setEnabled(movable and idx < len(doc.layers) - 1)
+        self.A["forward"].setEnabled(movable and idx < len(doc.layers) - 1)
+        self.A["backward"].setEnabled(movable and idx > bottom)
+        self.A["back"].setEnabled(movable and idx > bottom)
         for a in getattr(self, "_ext_actions", []):
             if a.property("needs_document"):
                 a.setEnabled(has)
@@ -645,6 +712,16 @@ class MainWindow(QMainWindow):
             if self.docs.widget(i).doc.path == path:
                 self.docs.setCurrentIndex(i)
                 return self.docs.widget(i)
+        if path.lower().endswith(".psd"):
+            try:
+                data = psd.read_psd(path)
+            except Exception as e:
+                QMessageBox.warning(self, "Lumen", f"Could not open “{os.path.basename(path)}”.\n\n{e}")
+                return None
+            doc = Document(size=data["size"], layers=data["layers"], path=path, dpi=data["dpi"])
+            self.ctx.settings.setValue("last_dir", os.path.dirname(path))
+            self._add_recent(path)
+            return self.add_document(doc)
         reader = QImageReader(path)
         reader.setAutoTransform(True)
         img = reader.read()
@@ -659,9 +736,23 @@ class MainWindow(QMainWindow):
         self._add_recent(path)
         return self.add_document(doc)
 
+    @staticmethod
+    def is_simple(doc):
+        """True when saving as PNG/JPEG etc. loses nothing (one plain pixel layer)."""
+        return len(doc.layers) == 1 and not doc.layers[0].is_text and doc.layers[0].visible \
+            and doc.layers[0].opacity == 100 and doc.layers[0].fill == 100
+
     def _write(self, doc, path, fmt=None):
+        doc.commit_floating()             # also commits any text being typed
         fmt = (fmt or os.path.splitext(path)[1].lstrip(".")).lower()
         fmt = {"jpeg": "jpg", "tiff": "tif"}.get(fmt, fmt)
+        if fmt == "psd":
+            try:
+                psd.write_psd(path, doc)
+            except Exception as e:
+                QMessageBox.critical(self, "Lumen", f"Could not save “{os.path.basename(path)}”.\n\n{e}")
+                return False
+            return True
         img = doc.flattened()
         quality = -1
         if fmt == "jpg":
@@ -704,8 +795,10 @@ class MainWindow(QMainWindow):
         if not doc:
             return False
         ext = os.path.splitext(doc.path or "")[1].lower().lstrip(".")
-        if not doc.path or ext not in ("png", "jpg", "jpeg", "bmp", "webp", "tif", "tiff"):
+        if not doc.path or ext not in ("psd", "png", "jpg", "jpeg", "bmp", "webp", "tif", "tiff"):
             return self.save_as(doc)
+        if ext != "psd" and not self.is_simple(doc):
+            return self.save_as(doc)      # Photoshop: layered work goes to Save As (.psd) rather than flattening
         if self._write(doc, doc.path):
             doc.commit_floating()
             doc.undo.setClean()
@@ -716,13 +809,20 @@ class MainWindow(QMainWindow):
     def _ask_path(self, doc, title):
         start_dir = os.path.dirname(doc.path) if doc.path else self.ctx.settings.value("last_dir", os.path.expanduser("~"))
         base = os.path.splitext(doc.name)[0]
-        path, flt = QFileDialog.getSaveFileName(self, title, os.path.join(start_dir, base + ".png"),
-                                                ";;".join(SAVE_FILTERS))
+        cur = os.path.splitext(doc.path or "")[1].lower().lstrip(".")
+        if title == "Export As":
+            default = cur if cur in ("png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff") else "png"
+        else:
+            default = "psd" if not self.is_simple(doc) or cur == "psd" or not cur else cur
+        default = {"jpeg": "jpg", "tiff": "tif"}.get(default, default)
+        flt0 = next((f for f, e in SAVE_FILTERS.items() if e == default), "PNG (*.png)")
+        path, flt = QFileDialog.getSaveFileName(self, title, os.path.join(start_dir, f"{base}.{default}"),
+                                                ";;".join(SAVE_FILTERS), flt0)
         if not path:
             return None
         ext = os.path.splitext(path)[1].lower().lstrip(".")
-        if ext not in ("png", "jpg", "jpeg", "bmp", "webp", "tif", "tiff"):
-            path += "." + SAVE_FILTERS.get(flt, "png")
+        if ext not in ("psd", "png", "jpg", "jpeg", "bmp", "webp", "tif", "tiff"):
+            path += "." + SAVE_FILTERS.get(flt, default)
         self.ctx.settings.setValue("last_dir", os.path.dirname(path))
         return path
 
@@ -835,6 +935,10 @@ class MainWindow(QMainWindow):
 
     def undo(self):
         d = self.current_doc()
+        if d and d.editing_text is not None:
+            d.editing_text.cancel()
+            self._update_actions()
+            return
         if d and d.cancel_floating():
             self._update_actions()
             return
@@ -847,16 +951,17 @@ class MainWindow(QMainWindow):
         self.undo_group.redo()
 
     def copy(self, merged=False):
+        """Copy the selection (or whole canvas) from the active layer, or from all layers when merged."""
         d = self.current_doc()
         if not d:
             return
-        if d.floating:
+        if d.floating and not merged:
             img = d.floating.image
-        elif d.has_selection():
-            img = imageops.masked_copy(d.image, d.selection)
         else:
-            img = d.image
-        if img.isNull():
+            d.commit_floating()
+            src = d.composite() if merged else d.layer_pixels()
+            img = imageops.masked_copy(src, d.selection) if d.has_selection() else src.copy()
+        if img is None or img.isNull():
             return
         QGuiApplication.clipboard().setImage(img.convertToFormat(QImage.Format.Format_ARGB32))
         return img
@@ -870,32 +975,48 @@ class MainWindow(QMainWindow):
         d.clear_selection_pixels("Cut")
 
     def paste(self):
+        """Photoshop pastes onto a new layer, centred in the view (or in place over the selection)."""
         img = QGuiApplication.clipboard().image()
         if img.isNull():
             self.statusBar().showMessage("The clipboard doesn't contain an image.", 4000)
             return
         cv = self.current_canvas()
         if cv is None:
-            cv = self.create_document(img.width(), img.height(), QColor("white") if not img.hasAlphaChannel() else None)
+            cv = self.create_document(img.width(), img.height(), None)
+            cv.doc.layers[0].name = "Layer 1"
+            cv.doc.layers[0].put_region(QRect(0, 0, img.width(), img.height()), imageops.to_working(img))
+            cv.doc.invalidate(QRect())
+            cv.doc.layersChanged.emit()
+            self.set_tool("move")
+            return
         d = cv.doc
-        centre = cv.visible_image_rect().center() if cv.isVisible() else QRectF(d.rect()).center()
+        d.commit_floating()
+        if d.has_selection():
+            centre = QRectF(d.selection_bounds()).center()
+        elif cv.isVisible():
+            centre = cv.visible_image_rect().center()
+        else:
+            centre = QRectF(d.rect()).center()
         pos = QPoint(round(centre.x() - img.width() / 2), round(centre.y() - img.height() / 2))
         if img.width() >= d.width and img.height() >= d.height:
             pos = QPoint(0, 0)
-        d.paste_floating(img, pos)
+        d.add_layer(d.next_layer_name(), imageops.to_working(img), pos, text="Paste")
         self.set_tool("move")
-        self.statusBar().showMessage("Pasted — drag to position, Enter to apply, Esc to cancel.", 6000)
 
     def clear(self):
+        """Delete/Backspace: clear the selection; with no selection, delete the layer (Photoshop CC)."""
         d = self.current_doc()
-        if d:
-            if d.floating:
-                d.cancel_floating() if d.floating.label == "Paste" else self._clear_floating(d)
-                return
+        if not d:
+            return
+        if d.floating:
+            self._clear_floating(d)
+            return
+        if d.has_selection():
             d.clear_selection_pixels("Clear")
+        else:
+            d.delete_layer()
 
     def _clear_floating(self, d):
-        # deleting a lifted selection: keep the hole, drop the pixels
         d.floating.image.fill(Qt.GlobalColor.transparent)
         d.floating.label = "Clear"
         d.commit_floating()
@@ -905,13 +1026,76 @@ class MainWindow(QMainWindow):
         if d:
             d.filter_region(label, fn)
 
-    # ---------------------------------------------------------------- image ops
+    # ---------------------------------------------------------------- layer UI
+    def _confirm_layer_action(self, kind, layer):
+        if kind == "rasterize":
+            r = QMessageBox.question(self, "Lumen", "This type layer must be rasterized before proceeding. "
+                                     "Its text will no longer be editable.\n\nRasterize the type?",
+                                     QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
+            return r == QMessageBox.StandardButton.Ok
+        return True
+
+    def new_layer_dialog(self):
+        d = self.current_doc()
+        if not d:
+            return
+        from .dialogs import NewLayerDialog
+        dlg = NewLayerDialog(d.next_layer_name(), self)
+        if dlg.exec():
+            name, blend, opacity = dlg.values()
+            L = d.add_layer(name)
+            if blend != "norm" or opacity != 100:
+                L.blend, L.opacity = blend, opacity
+                d.layersChanged.emit()
+
+    def rename_layer(self):
+        d = self.current_doc()
+        if d:
+            rows = self.layers_panel.list.rows()
+            self.layers_panel.list.start_rename(rows.index(d.active), d.active)
+
+    def edit_type_layer(self, layer):
+        cv = self.current_canvas()
+        if cv is None:
+            return
+        self.set_tool("text")
+        self.ctx.tools["text"].begin_edit(cv.doc, layer, select_all=True)
+        cv.setFocus()
+
+    # ---------------------------------------------------------------- image ops (every layer)
+    def _transform_layers(self, d, label, T: QTransform, new_size, smooth=False):
+        mode = Qt.TransformationMode.SmoothTransformation if smooth else Qt.TransformationMode.FastTransformation
+        layers, active = [], None
+        lin = QTransform(T.m11(), T.m12(), T.m21(), T.m22(), 0, 0)
+        for L in d.layers:
+            N = L.clone(keep_uid=True)
+            if L.is_text:
+                N.text.transform = L.text.transform * T
+                N.rerender_text()
+            else:
+                mapped = T.mapRect(QRectF(L.rect()))
+                img = L.image.transformed(lin, mode)
+                if smooth:
+                    img = L.image.scaled(max(1, round(mapped.width())), max(1, round(mapped.height())),
+                                         Qt.AspectRatioMode.IgnoreAspectRatio, mode)
+                N.image = imageops.to_working(img)
+                N.offset = QPoint(round(mapped.left()), round(mapped.top()))
+                if L.background and N.image.size() != new_size:
+                    N.image = N.image.scaled(new_size, Qt.AspectRatioMode.IgnoreAspectRatio, mode)
+                    N.offset = QPoint(0, 0)
+            layers.append(N)
+            if L is d.active:
+                active = N
+        d.replace_state(label, new_size, layers, active)
+
     def _transform(self, label, tr):
         d = self.current_doc()
         if not d:
             return
         d.commit_floating()
-        d.replace_image(label, d.image.transformed(tr, Qt.TransformationMode.FastTransformation))
+        box = tr.mapRect(QRectF(d.rect()))
+        T = tr * QTransform.fromTranslate(-box.left(), -box.top())
+        self._transform_layers(d, label, T, box.toRect().size())
 
     def image_size(self):
         d = self.current_doc()
@@ -925,8 +1109,9 @@ class MainWindow(QMainWindow):
     def resize_image(self, d, w, h, smooth=True):
         if (w, h) == (d.width, d.height):
             return
-        mode = Qt.TransformationMode.SmoothTransformation if smooth else Qt.TransformationMode.FastTransformation
-        d.replace_image("Image Size", d.image.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, mode))
+        d.commit_floating()
+        T = QTransform.fromScale(w / d.width, h / d.height)
+        self._transform_layers(d, "Image Size", T, QSize(w, h), smooth)
 
     def canvas_size(self):
         d = self.current_doc()
@@ -940,15 +1125,28 @@ class MainWindow(QMainWindow):
     def resize_canvas(self, d, w, h, anchor=(1, 1), ext=0):
         if (w, h) == (d.width, d.height):
             return
-        out = QImage(w, h, imageops.PREMUL)
+        d.commit_floating()
         fill = [self.ctx.bg, self.ctx.fg, QColor("white"), QColor("black"), None][ext]
-        out.fill(Qt.GlobalColor.transparent if fill is None else fill)
         dx = round((w - d.width) * anchor[0] / 2)
         dy = round((h - d.height) * anchor[1] / 2)
-        p = QPainter(out)
-        p.drawImage(dx, dy, d.image)
-        p.end()
-        d.replace_image("Canvas Size", out)
+        layers, active = [], None
+        for L in d.layers:
+            N = L.clone(keep_uid=True)
+            if L.background:
+                out = QImage(w, h, imageops.PREMUL)
+                out.fill(fill if fill is not None else d.bg_color)
+                p = QPainter(out)
+                p.drawImage(L.offset + QPoint(dx, dy), L.image)
+                p.end()
+                N.image, N.offset = out, QPoint(0, 0)
+            else:
+                N.translate(dx, dy)
+                if N.is_text:
+                    N.rerender_text()
+            layers.append(N)
+            if L is d.active:
+                active = N
+        d.replace_state("Canvas Size", QSize(w, h), layers, active)
 
     def crop_to_selection(self):
         d = self.current_doc()
@@ -1013,7 +1211,16 @@ class MainWindow(QMainWindow):
     def _toggle_setting(self, key):
         return lambda checked=False: self.ctx.settings.setValue(key, bool(checked))
 
+    def _emit_ext(self, event, *args):
+        for fn in list(self.ext_events.get(event, [])):
+            try:
+                fn(*args)
+            except Exception as e:
+                self.statusBar().showMessage(f"Extension error ({event}): {e}", 6000)
+
     def _init_extensions(self):
+        self.ext_events = {}
+        self.ctx.toolChanged.connect(lambda t: self._emit_ext("tool_changed", t))
         self.last_filter = None
         self._ext_actions = []
         self.extensions = ExtensionManager(self.ctx.settings)

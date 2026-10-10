@@ -14,13 +14,33 @@ def to_working(img: QImage) -> QImage:
     return img
 
 
+class _PixelBuffer:
+    """Buffer exporter that owns the QImage, so numpy views keep the pixels alive (view(img.copy()) is safe)."""
+    __slots__ = ("img", "ptr")
+
+    def __init__(self, img, ptr):
+        self.img, self.ptr = img, ptr
+
+    def __buffer__(self, flags):
+        return memoryview(self.ptr)
+
+
 def view(img: QImage) -> np.ndarray:
-    """Writable (h, w, 4) BGRA view onto a 32-bit QImage's pixels."""
+    """Writable (h, w, 4) BGRA view onto a 32-bit QImage's pixels. The array keeps `img` alive."""
     w, h = img.width(), img.height()
     ptr = img.bits()
     ptr.setsize(img.sizeInBytes())
-    arr = np.frombuffer(ptr, np.uint8).reshape(h, img.bytesPerLine() // 4, 4)
-    return arr[:, :w]
+    try:
+        buf = _PixelBuffer(img, ptr)
+        arr = np.frombuffer(buf, np.uint8)
+    except TypeError:                       # Python < 3.12: no __buffer__ support (caller must keep img)
+        arr = np.frombuffer(ptr, np.uint8)
+    return arr.reshape(h, img.bytesPerLine() // 4, 4)[:, :w]
+
+
+def to_array(img: QImage) -> np.ndarray:
+    """Independent (h, w, 4) uint8 copy of the premultiplied BGRA pixels."""
+    return np.array(view(to_working(img)), dtype=np.uint8)
 
 
 def from_array(arr: np.ndarray, fmt=PREMUL) -> QImage:

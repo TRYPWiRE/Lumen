@@ -14,6 +14,7 @@ os.environ["LUMEN_OFFLINE"] = "1"
 _tmp = tempfile.mkdtemp(prefix="lumen-tests-")
 os.environ["LUMEN_SETTINGS"] = os.path.join(_tmp, "settings.ini")
 os.environ["LUMEN_DATA_DIR"] = os.path.join(_tmp, "data")
+os.environ["LUMEN_BUNDLED_EXTENSIONS"] = os.path.join(_tmp, "no-bundled")   # tests opt in explicitly
 
 # Hide harmless messages from the offscreen platform so real failures are easy to spot.
 from PyQt6.QtCore import qInstallMessageHandler  # noqa: E402

@@ -65,6 +65,21 @@ def register(api):
     api.add_panel("My Panel", widget)
 ```
 
+Extensions can also work with layers and draw on the canvas (API version 2):
+
+```python
+def register(api):
+    doc = api.current_document()                  # doc.layers (bottom → top), doc.active
+    api.new_layer("Glow", image, QPoint(10, 10))  # undoable
+    api.set_layer_image(layer, canvas_sized_image, "My Effect")
+    api.layer_image(layer); api.composite()
+    api.add_canvas_overlay(lambda painter, canvas: ...)   # canvas.img_to_view(pt) maps image → screen
+    api.on("layers_changed", fn); api.on("document_changed", fn); api.on("tool_changed", fn)
+```
+
+Built-in extensions live in `extensions/` and ship inside the installer. A newer version published to GitHub
+replaces the built-in one for that user, and *Revert* in the Extensions window goes back to the shipped copy.
+
 Extensions can import `PyQt6`, `numpy` and `lumen`. Those are bundled in the installed app; other pip packages
 aren't. `min_app` stops the extension from being offered to Lumen versions too old to run it. To test locally
 without publishing, use *Plugins ▸ Extensions… ▸ Install from File…* with a zip of the folder.

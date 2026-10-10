@@ -329,40 +329,37 @@ class CanvasSizeDialog(QDialog):
         return max(1, w), max(1, h), self.anchor.anchor, self.ext.currentIndex()
 
 
-class TextDialog(QDialog):
-    textChanged = pyqtSignal(str)
-
-    def __init__(self, tool, parent=None):
+class NewLayerDialog(QDialog):
+    def __init__(self, name, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Type")
-        self.setModal(True)
+        self.setWindowTitle("New Layer")
+        from .layers import BLEND_MODES
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(16, 14, 16, 14)
-        lay.addWidget(_heading("Enter text"))
-        tip = QLabel("Preview updates on the canvas as you type. Ctrl+Enter to commit.")
-        tip.setObjectName("Dim")
-        lay.addWidget(tip)
-        self.edit = QPlainTextEdit()
-        self.edit.setMinimumSize(360, 110)
-        f = tool.font()
-        f.setPixelSize(16)
-        self.edit.setFont(f)
-        self.edit.textChanged.connect(lambda: self.textChanged.emit(self.edit.toPlainText()))
-        lay.addWidget(self.edit)
-        row, ok = _buttons(self, "Commit")
+        lay.setContentsMargins(18, 16, 18, 16)
+        lay.setSpacing(10)
+        lay.addWidget(_heading("New Layer"))
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        self.name = QLineEdit(name)
+        self.name.selectAll()
+        self.mode = QComboBox()
+        for m in BLEND_MODES:
+            if m is None:
+                self.mode.insertSeparator(self.mode.count())
+            else:
+                self.mode.addItem(m[1], m[0])
+        self.opacity = _spin(0, 100, 100, " %", 70)
+        for r, (label, w) in enumerate((("Name:", self.name), ("Mode:", self.mode), ("Opacity:", self.opacity))):
+            grid.addWidget(QLabel(label), r, 0)
+            grid.addWidget(w, r, 1)
+        lay.addLayout(grid)
+        row, ok = _buttons(self)
         lay.addLayout(row)
-        ok.setDefault(False)
-        ok.setAutoDefault(False)
-        ok.setObjectName("Primary")
+        self.setMinimumWidth(380)
 
-    def keyPressEvent(self, ev):
-        if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and ev.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            self.accept()
-            return
-        super().keyPressEvent(ev)
-
-    def text(self):
-        return self.edit.toPlainText()
+    def values(self):
+        return self.name.text().strip() or "Layer", self.mode.currentData(), self.opacity.value()
 
 
 class QualityDialog(QDialog):

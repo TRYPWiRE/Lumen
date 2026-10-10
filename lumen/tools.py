@@ -166,9 +166,10 @@ class StrokeTool(Tool):
         lay.addWidget(separator())
         self.spin(lay, "opacity", "Opacity", 1, 100, "%")
 
-    def _color(self, doc):
+    def _color(self, layer):
         if self.erase:
-            return doc.bg_color if not doc.transparent else QColor(0, 0, 0)
+            # the Background (or a layer with locked transparency) can't become transparent
+            return self.doc.bg_color if (layer.background or layer.alpha_locked()) else QColor(0, 0, 0)
         return self.ctx.fg
 
     def press(self, cv, pt, ev):
@@ -177,13 +178,18 @@ class StrokeTool(Tool):
         doc = cv.doc
         doc.commit_floating()
         self.cv, self.doc = cv, doc
+        layer = doc.try_target("use the " + self.title)
+        if layer is None:
+            return
+        self.layer = layer
+        layer.ensure_covers(doc.rect())
         self.active = True
-        self.working = doc.image.copy()
+        self.working = layer.image.copy()
         self.mask = np.zeros((doc.height, doc.width), np.uint8)
         hard = self.opts["hardness"] / 100.0 if not self.pencil else 1.0
         self.stamp = imageops.make_stamp(self.opts["size"], hard, self.pencil)
         self.spacing = max(1.0, self.opts["size"] * (0.25 if self.pencil else 0.1))
-        self.color = self._color(doc)
+        self.color = self._color(layer)
         self.opacity = self.opts["opacity"] / 100.0
         self.dirty = QRect()
         self.pending = QRect()
@@ -209,11 +215,12 @@ class StrokeTool(Tool):
             return
         self.active = False
         self._last_end[id(self.doc)] = QPointF(self.last)
-        self.doc.preview = None
+        L = self.layer
+        L.preview = None
         if not self.dirty.isEmpty():
-            self.doc.apply_patch(self.title, self.dirty, self.working.copy(self.dirty))
+            self.doc.apply_patch(self.title, self.dirty, L.region(self.dirty, self.working), layer=L)
         else:
-            self.doc.changed.emit(QRect())
+            self.doc.invalidate(QRect())
         self.working = None
         self.mask = None
 
@@ -252,16 +259,23 @@ class StrokeTool(Tool):
         self.dirty = self.dirty.united(r)
         layer = imageops.colorize(self.mask[r.top():r.bottom() + 1, r.left():r.right() + 1],
                                   self.color, self.opacity)
+        L = self.layer
+        CM = QPainter.CompositionMode
         p = QPainter(self.working)
-        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-        p.drawImage(r.topLeft(), self.doc.image, r)
-        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        p.translate(-L.offset)                      # paint in document coordinates
+        p.setCompositionMode(CM.CompositionMode_Source)
+        p.drawImage(r.topLeft(), L.image, r.translated(-L.offset))
         self.doc.clip(p)
-        if self.erase and self.doc.transparent:
-            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationOut)
+        if self.erase and not (L.background or L.alpha_locked()):
+            p.setCompositionMode(CM.CompositionMode_DestinationOut)
+        elif L.alpha_locked() and not L.background:
+            p.setCompositionMode(CM.CompositionMode_SourceAtop)
+        else:
+            p.setCompositionMode(CM.CompositionMode_SourceOver)
         p.drawImage(r.topLeft(), layer)
         p.end()
-        self.doc.set_preview(self.working, r)
+        L.preview = self.working
+        self.doc.invalidate(r)
 
     def key_press(self, canvas, ev):
         k = ev.key()
@@ -295,7 +309,7 @@ class EraserTool(StrokeTool):
 class BucketTool(Tool):
     name, title, icon, key = "bucket", "Paint Bucket Tool", "bucket", "G"
     alt_picks = True
-    defaults = {"tolerance": 32, "opacity": 100, "contiguous": True}
+    defaults = {"tolerance": 32, "opacity": 100, "contiguous": True, "all_layers": False}
 
     def cursor(self, canvas):
         return icons.tool_cursor("bucket", (20, 19))
@@ -304,6 +318,7 @@ class BucketTool(Tool):
         self.spin(lay, "opacity", "Opacity", 1, 100, "%")
         self.spin(lay, "tolerance", "Tolerance", 0, 255)
         self.check(lay, "contiguous", "Contiguous")
+        self.check(lay, "all_layers", "All Layers")
 
     def press(self, cv, pt, ev):
         if ev.button() != LEFT:
@@ -314,19 +329,23 @@ class BucketTool(Tool):
             return
         doc.commit_floating()
         fill_at(doc, x, y, self.ctx.fg, self.opts["tolerance"], self.opts["contiguous"],
-                self.opts["opacity"] / 100.0)
+                self.opts["opacity"] / 100.0, self.opts["all_layers"])
 
 
-def fill_at(doc, x, y, color, tolerance=32, contiguous=True, opacity=1.0):
-    mask = imageops.flood_mask(doc.image, x, y, tolerance, contiguous)
+def fill_at(doc, x, y, color, tolerance=32, contiguous=True, opacity=1.0, all_layers=False):
+    layer = doc.try_target("use the Paint Bucket")
+    if layer is None:
+        return
+    source = doc.composite() if all_layers else layer.region(doc.rect())
+    mask = imageops.flood_mask(source, x, y, tolerance, contiguous)
     rows = np.flatnonzero(mask.any(axis=1))
     cols = np.flatnonzero(mask.any(axis=0))
     if rows.size == 0:
         return
     rect = QRect(int(cols[0]), int(rows[0]), int(cols[-1] - cols[0] + 1), int(rows[-1] - rows[0] + 1))
-    layer = imageops.mask_to_image(mask[rect.top():rect.bottom() + 1, rect.left():rect.right() + 1],
-                                   color, opacity)
-    doc.apply_region("Paint Bucket", rect, lambda p: p.drawImage(rect.topLeft(), layer))
+    fill_img = imageops.mask_to_image(mask[rect.top():rect.bottom() + 1, rect.left():rect.right() + 1],
+                                      color, opacity)
+    doc.apply_region("Paint Bucket", rect, lambda p: p.drawImage(rect.topLeft(), fill_img))
 
 
 class GradientTool(Tool):
@@ -399,10 +418,14 @@ def apply_gradient(doc, a, b, fg, bg, opts):
 # =================================================================== shapes
 class ShapeTool(Tool):
     alt_picks = True
-    defaults = {"fill": True, "stroke": False, "width": 3}
+    defaults = {"fill": True, "stroke": False, "width": 3, "pixels": 0}
     kind = "rect"
+    layer_base = "Shape"
 
     def build_options(self, lay):
+        self.combo(lay, "pixels", "", ["Shape", "Pixels"]).setToolTip(
+            "Shape: each shape goes on its own new layer · Pixels: draw on the current layer")
+        lay.addWidget(separator())
         if self.kind != "line":
             c = self.check(lay, "fill", "Fill")
             self.fill_swatch = Swatch(self.ctx.fg, 16)
@@ -482,7 +505,21 @@ class ShapeTool(Tool):
                 self.ctx.status.emit("Turn on Fill or Stroke in the options bar to draw a shape.")
                 return
             bounds = geo.adjusted(-2, -2, 2, 2)
-        cv.doc.apply_region(self.title.replace(" Tool", ""), bounds.toAlignedRect(), lambda p: self.draw(p, geo))
+        label = self.title.replace(" Tool", "")
+        doc = cv.doc
+        if self.opts.get("pixels", 0) == 1:
+            doc.apply_region(label, bounds.toAlignedRect(), lambda p: self.draw(p, geo))
+            return
+        r = bounds.toAlignedRect().intersected(doc.rect())
+        if r.isEmpty():
+            return
+        img = QImage(r.size(), imageops.PREMUL)
+        img.fill(Qt.GlobalColor.transparent)
+        p = QPainter(img)
+        p.translate(-r.topLeft())
+        self.draw(p, geo)
+        p.end()
+        doc.add_layer(doc.next_layer_name(self.layer_base), img, r.topLeft(), text=label)
 
     def paint_overlay(self, p, cv):
         if not self.active:
@@ -493,17 +530,20 @@ class ShapeTool(Tool):
 
 class RectTool(ShapeTool):
     name, title, icon, key, kind = "rect", "Rectangle Tool", "rect", "U", "rect"
+    layer_base = "Rectangle"
     hint = "Shift: square · Alt: from centre"
 
 
 class EllipseTool(ShapeTool):
     name, title, icon, key, kind = "ellipse", "Ellipse Tool", "ellipse", "U", "ellipse"
+    layer_base = "Ellipse"
     hint = "Shift: circle · Alt: from centre"
 
 
 class LineTool(ShapeTool):
     name, title, icon, key, kind = "line", "Line Tool", "line", "U", "line"
-    defaults = {"width": 3}
+    defaults = {"width": 3, "pixels": 0}
+    layer_base = "Line"
     hint = "Shift: snap to 45°"
 
 
@@ -689,38 +729,83 @@ class LassoTool(SelectionTool):
 
 
 # =================================================================== move
+def layer_at(doc, pt):
+    """Topmost visible layer with a visible pixel under document point pt."""
+    ip = QPoint(math.floor(pt.x()), math.floor(pt.y()))
+    for L in reversed(doc.layers):
+        if L.visible and L.opacity > 0 and L.alpha_at(ip) > 10:
+            return L
+    return None
+
+
 class MoveTool(Tool):
     name, title, icon, key = "move", "Move Tool", "move", "V"
-    hint = "Drag a selection to move its pixels · Arrow keys nudge · Enter applies · Esc cancels"
+    defaults = {"auto_select": False}
+    hint = "Drag to move the layer (or selected pixels) · Ctrl+click picks a layer · Arrows nudge"
 
     def cursor(self, canvas):
         return QCursor(Qt.CursorShape.SizeAllCursor)
+
+    def build_options(self, lay):
+        c = self.check(lay, "auto_select", "Auto-Select Layer")
+        c.setToolTip("Click picks the topmost layer under the cursor (hold Ctrl to do this once)")
+        lay.addWidget(separator())
 
     def press(self, cv, pt, ev):
         if ev.button() != LEFT:
             return
         doc = cv.doc
-        if not doc.floating:
-            if not doc.has_selection():
-                self.ctx.status.emit("Make a selection first, then drag it with the Move tool.")
-                return
-            doc.lift_selection("Move")
-        self.active = True
+        if doc.editing_text is not None:
+            doc.editing_text.commit()
+        if bool(self.opts["auto_select"]) != bool(ev.modifiers() & CTRL):
+            hit = layer_at(doc, pt)
+            if hit is not None and hit is not doc.active:
+                doc.set_active(hit)
         self.start = pt
         self.applied = QPoint(0, 0)
+        self.mode = None
+        L = doc.active
+        if doc.floating or (doc.has_selection() and not L.is_text):
+            if not doc.floating and not doc.lift_selection("Move"):
+                return
+            self.mode = "pixels"
+        else:
+            if L.position_locked():
+                doc.blocked.emit("Could not use the Move tool because the layer is locked."
+                                 + (" Double-click the Background in the Layers panel to unlock it."
+                                    if L.background else ""))
+                return
+            self.mode = "layer"
+            self.layer = L
+        self.active = True
 
     def move(self, cv, pt, ev):
         if not self.active:
             return
         d = pt - self.start
+        if ev.modifiers() & SHIFT:                       # constrain to horizontal / vertical
+            d = QPointF(d.x(), 0) if abs(d.x()) >= abs(d.y()) else QPointF(0, d.y())
         target = QPoint(round(d.x()), round(d.y()))
         step = target - self.applied
-        if step.x() or step.y():
-            cv.doc.move_floating(step.x(), step.y())
-            self.applied = target
+        if not (step.x() or step.y()):
+            return
+        doc = cv.doc
+        if self.mode == "pixels":
+            doc.move_floating(step.x(), step.y())
+        else:
+            old = self.layer.rect()
+            self.layer.translate(step.x(), step.y())
+            doc.invalidate(old.united(self.layer.rect()))
+        self.applied = target
 
     def release(self, cv, pt, ev):
+        if not self.active:
+            return
         self.active = False
+        if self.mode == "layer" and (self.applied.x() or self.applied.y()):
+            L, d = self.layer, self.applied
+            L.translate(-d.x(), -d.y())                   # the command re-applies it (undoable)
+            cv.doc.undo.push(_move_cmd(cv.doc, L, d.x(), d.y()))
 
     def deactivate(self, canvas):
         if canvas:
@@ -731,11 +816,16 @@ class MoveTool(Tool):
         doc = cv.doc
         arrows = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0), Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
         if k in arrows:
-            if not doc.floating and not doc.lift_selection("Nudge"):
-                return False
             dx, dy = arrows[k]
             n = 10 if ev.modifiers() & SHIFT else 1
-            doc.move_floating(dx * n, dy * n)
+            if doc.floating or (doc.has_selection() and not doc.active.is_text):
+                if not doc.floating and not doc.lift_selection("Nudge"):
+                    return True
+                doc.move_floating(dx * n, dy * n)
+            elif doc.active.position_locked():
+                doc.blocked.emit("Could not move because the layer is locked.")
+            else:
+                doc.undo.push(_move_cmd(doc, doc.active, dx * n, dy * n, "Nudge"))
             return True
         if k in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and doc.floating:
             doc.commit_floating()
@@ -744,6 +834,11 @@ class MoveTool(Tool):
             doc.cancel_floating()
             return True
         return False
+
+
+def _move_cmd(doc, layer, dx, dy, text="Move"):
+    from .document import MoveLayerCommand
+    return MoveLayerCommand(doc, layer, dx, dy, text)
 
 
 # =================================================================== crop
@@ -907,20 +1002,42 @@ class CropTool(Tool):
 
 
 def crop_document(doc, r: QRect, label="Crop"):
+    """Crop every layer to r (pixels outside are deleted, like Photoshop's default)."""
     if r.width() < 1 or r.height() < 1:
         return
-    out = QImage(r.size(), imageops.PREMUL)
-    out.fill(Qt.GlobalColor.transparent if doc.transparent else doc.bg_color)
-    p = QPainter(out)
-    p.drawImage(-r.topLeft(), doc.image)
-    p.end()
-    doc.replace_image(label, out)
+    from .layers import Layer
+    new_layers, active = [], None
+    for L in doc.layers:
+        N = L.clone(keep_uid=True)
+        if L.is_text:
+            N.translate(-r.x(), -r.y())
+            N.rerender_text()
+        elif L.background:
+            img = QImage(r.size(), imageops.PREMUL)
+            img.fill(doc.bg_color)
+            p = QPainter(img)
+            p.drawImage(L.offset - r.topLeft(), L.image)
+            p.end()
+            N.image, N.offset = img, QPoint(0, 0)
+        else:
+            inter = L.rect().intersected(r)
+            if inter.isEmpty():
+                N.image = QImage(1, 1, imageops.PREMUL)
+                N.image.fill(Qt.GlobalColor.transparent)
+                N.offset = QPoint(0, 0)
+            else:
+                N.image = L.image.copy(inter.translated(-L.offset))
+                N.offset = inter.topLeft() - r.topLeft()
+        new_layers.append(N)
+        if L is doc.active:
+            active = N
+    doc.replace_state(label, r.size(), new_layers, active)
 
 
 # =================================================================== sampling
 class EyedropperTool(Tool):
     name, title, icon, key = "eyedropper", "Eyedropper Tool", "eyedropper", "I"
-    defaults = {"sample": 0}
+    defaults = {"sample": 0, "layers": 0}
     hint = "Click to set the foreground colour · Alt+click sets the background"
     SIZES = [1, 3, 5, 11, 31]
 
@@ -930,12 +1047,14 @@ class EyedropperTool(Tool):
     def build_options(self, lay):
         self.combo(lay, "sample", "Sample Size:", ["Point Sample", "3 by 3 Average", "5 by 5 Average",
                                                    "11 by 11 Average", "31 by 31 Average"])
+        self.combo(lay, "layers", "Sample:", ["All Layers", "Current Layer"])
 
     def _pick(self, cv, pt, mods):
         x, y = math.floor(pt.x()), math.floor(pt.y())
         if not cv.doc.rect().contains(x, y):
             return
-        c = imageops.sample(cv.doc.flattened(), x, y, self.SIZES[self.opts["sample"]])
+        src = cv.doc.composite() if self.opts.get("layers", 0) == 0 else cv.doc.layer_pixels()
+        c = imageops.sample(src, x, y, self.SIZES[self.opts["sample"]])
         if c.alpha() == 0:
             return
         if mods & ALT:
@@ -982,103 +1101,6 @@ class EyedropperTool(Tool):
         p.setPen(QPen(QColor(70, 70, 70), 3))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawEllipse(c, 28.5, 28.5)
-
-
-# =================================================================== text
-class TextTool(Tool):
-    name, title, icon, key = "text", "Horizontal Type Tool", "text", "T"
-    defaults = {"family": "Segoe UI", "size": 48, "bold": False, "italic": False}
-    hint = "Click on the image to place text"
-
-    def cursor(self, canvas):
-        return QCursor(Qt.CursorShape.IBeamCursor)
-
-    def build_options(self, lay):
-        fc = QFontComboBox()
-        fc.setCurrentFont(QFont(self.opts["family"]))
-        fc.setFixedWidth(170)
-        fc.currentFontChanged.connect(lambda f: self.set_opt("family", f.family()))
-        lay.addWidget(fc)
-        self.spin(lay, "size", "", 1, 1000, " px")
-        for key, label in (("bold", "B"), ("italic", "I")):
-            b = QToolButton()
-            b.setText(label)
-            b.setCheckable(True)
-            b.setChecked(bool(self.opts[key]))
-            f = b.font()
-            f.setBold(key == "bold")
-            f.setItalic(key == "italic")
-            b.setFont(f)
-            b.setFixedSize(26, 26)
-            b.toggled.connect(lambda v, k=key: self.set_opt(k, v))
-            lay.addWidget(b)
-        lay.addWidget(separator())
-        self.swatch = Swatch(self.ctx.fg, 18)
-        self.swatch.setToolTip("Text uses the foreground colour")
-        self.ctx.colorsChanged.connect(lambda: self.swatch.set_color(self.ctx.fg))
-        lay.addWidget(self.swatch)
-
-    def font(self):
-        f = QFont(self.opts["family"])
-        f.setPixelSize(max(1, int(self.opts["size"])))
-        f.setBold(bool(self.opts["bold"]))
-        f.setItalic(bool(self.opts["italic"]))
-        return f
-
-    def layout(self, pt, text):
-        f = self.font()
-        fm = QFontMetricsF(f)
-        lines = text.split("\n")
-        bounds = QRectF()
-        y = pt.y()
-        for ln in lines:
-            br = fm.boundingRect(ln or " ").translated(pt.x(), y)
-            bounds = bounds.united(br)
-            y += fm.lineSpacing()
-        return f, fm, lines, bounds.adjusted(-4, -4, 4, 4)
-
-    def render(self, p, pt, text):
-        f, fm, lines, _ = self.layout(pt, text)
-        p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setFont(f)
-        p.setPen(self.ctx.fg)
-        y = pt.y()
-        for ln in lines:
-            p.drawText(QPointF(pt.x(), y), ln)
-            y += fm.lineSpacing()
-
-    def preview(self, doc, pt, text):
-        img = doc.image.copy()
-        if text:
-            p = QPainter(img)
-            doc.clip(p)
-            self.render(p, pt, text)
-            p.end()
-        doc.set_preview(img)
-
-    def commit_text(self, doc, pt, text):
-        doc.preview = None
-        if not text.strip():
-            doc.changed.emit(QRect())
-            return
-        _, _, _, bounds = self.layout(pt, text)
-        label = "Type: " + (text.split("\n")[0][:20] or "Text")
-        doc.apply_region(label, bounds.toAlignedRect(), lambda p: self.render(p, pt, text))
-
-    def press(self, cv, pt, ev):
-        if ev.button() != LEFT:
-            return
-        from .dialogs import TextDialog
-        doc = cv.doc
-        doc.commit_floating()
-        pt = QPointF(round(pt.x()), round(pt.y()))
-        dlg = TextDialog(self, cv.window())
-        dlg.textChanged.connect(lambda t: self.preview(doc, pt, t))
-        if dlg.exec():
-            self.commit_text(doc, pt, dlg.text())
-        else:
-            doc.set_preview(None)
 
 
 # =================================================================== navigation
@@ -1131,8 +1153,12 @@ class ZoomTool(Tool):
 
 
 # =================================================================== registry
+from .typetool import _make_type_tool  # noqa: E402
+
+TypeTool = _make_type_tool(Tool)
+
 TOOL_CLASSES = [MoveTool, RectMarqueeTool, EllipseMarqueeTool, LassoTool, CropTool, EyedropperTool,
-                BrushTool, PencilTool, EraserTool, BucketTool, GradientTool, TextTool,
+                BrushTool, PencilTool, EraserTool, BucketTool, GradientTool, TypeTool,
                 RectTool, EllipseTool, LineTool, HandTool, ZoomTool]
 
 # (group id, [tool names], separator-after)

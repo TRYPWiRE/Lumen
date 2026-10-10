@@ -7,8 +7,10 @@ _ops = None  # api.imageops, set in register()
 
 # ---------------------------------------------------------------- pixel helpers
 def _to_float(img):
-    """QImage -> float32 (h, w, 4) premultiplied BGRA."""
-    return _ops.view(_ops.to_working(img).copy()).astype(np.float32)
+    """QImage -> float32 (h, w, 4) premultiplied BGRA.
+    (1.0.0 read pixels from a temporary image that had already been freed, so filters saw a blank image.)"""
+    src = _ops.to_working(img).copy()          # keep a reference while numpy reads it
+    return np.array(_ops.view(src), dtype=np.float32)
 
 
 def _to_image(arr):

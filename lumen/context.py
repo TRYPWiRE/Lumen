@@ -16,6 +16,7 @@ class AppContext(QObject):
         override = os.environ.get("LUMEN_SETTINGS")  # used by the test-suite so it never touches real prefs
         self.settings = QSettings(override, QSettings.Format.IniFormat) if override else QSettings("Lumen", "Lumen")
         self.window = None  # MainWindow, set later
+        self.canvas_overlays = []   # extension drawing hooks: fn(painter, canvas)
 
     @property
     def fg(self):

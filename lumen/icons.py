@@ -322,6 +322,86 @@ def d_trash(p, c):
     p.drawPolygon(_poly((7, 7), (8, 20), (16, 20), (17, 7)))
 
 
+def _align(p, c, mode):
+    p.setPen(_pen(c, 1.6))
+    for y, w in ((6, 16), (10, 10), (14, 16), (18, 10)):
+        x = 4 if mode == 0 else 12 - w / 2 if mode == 1 else 20 - w
+        p.drawLine(QPointF(x, y), QPointF(x + w, y))
+
+
+def d_align_left(p, c):
+    _align(p, c, 0)
+
+
+def d_align_center(p, c):
+    _align(p, c, 1)
+
+
+def d_align_right(p, c):
+    _align(p, c, 2)
+
+
+def d_eye(p, c):
+    p.setPen(_pen(c, 1.4))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    path = QPainterPath(QPointF(2.5, 12))
+    path.cubicTo(QPointF(7, 5), QPointF(17, 5), QPointF(21.5, 12))
+    path.cubicTo(QPointF(17, 19), QPointF(7, 19), QPointF(2.5, 12))
+    p.drawPath(path)
+    p.setBrush(c)
+    p.drawEllipse(QPointF(12, 12), 3, 3)
+
+
+def d_lock(p, c):
+    p.setPen(_pen(c, 1.6))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawArc(QRectF(7.5, 3.5, 9, 10), 0, 180 * 16)
+    p.drawLine(QPointF(7.5, 8.5), QPointF(7.5, 11))
+    p.drawLine(QPointF(16.5, 8.5), QPointF(16.5, 11))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    p.drawRoundedRect(QRectF(5, 11, 14, 10), 1.5, 1.5)
+
+
+def d_lock_alpha(p, c):
+    p.setPen(_pen(c, 1.2))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRect(QRectF(4, 4, 16, 16))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    for x in range(2):
+        for y in range(2):
+            p.drawRect(QRectF(4 + x * 8 + (4 if y else 0), 4 + y * 8, 4, 4))
+            p.drawRect(QRectF(4 + x * 8 + (0 if y else 4), 8 + y * 8, 4, 4))
+
+
+def d_lock_pixels(p, c):
+    p.setPen(_pen(c, 1.4))
+    p.drawLine(QPointF(5, 19), QPointF(16, 8))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    p.drawPolygon(_poly((15, 5), (19, 9), (21, 3)))
+
+
+def d_lock_position(p, c):
+    d_move(p, c)
+
+
+def d_new_layer(p, c):
+    p.setPen(_pen(c, 1.4))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(QRectF(4, 4, 16, 16), 2, 2)
+    p.drawLine(QPointF(12, 8), QPointF(12, 16))
+    p.drawLine(QPointF(8, 12), QPointF(16, 12))
+
+
+def d_layers(p, c):
+    p.setPen(_pen(c, 1.3))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    for dy in (0, 5):
+        p.drawPolygon(_poly((12, 4 + dy), (21, 9 + dy), (12, 14 + dy), (3, 9 + dy)))
+
+
 DRAWINGS = {k[2:]: v for k, v in dict(globals()).items() if k.startswith("d_")}
 
 

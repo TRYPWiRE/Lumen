@@ -5,6 +5,16 @@
         api.add_menu_action("Image/Adjustments", "Do Thing", callback, shortcut="Ctrl+Alt+T")
         api.add_tool(MyToolClass)                 # subclass of api.Tool
         api.add_panel("My Panel", widget)
+
+    Layers (API 2):
+        doc = api.current_document()
+        doc.layers / doc.active                   # bottom → top list, active layer
+        api.new_layer("Glow", image, QPoint(x, y))
+        api.layer_image(layer)                    # canvas-sized copy of a layer's pixels
+        api.set_layer_image(layer, image, "My Effect")    # undoable
+        api.composite()                           # flattened image of the visible layers
+        api.add_canvas_overlay(fn)                # fn(painter, canvas) draws on top of the canvas
+        api.on("layers_changed", fn) / api.on("document_changed", fn) / api.on("tool_changed", fn)
 """
 from PyQt6.QtGui import QAction, QKeySequence
 
@@ -12,7 +22,7 @@ from .. import __version__, imageops
 from ..tools import Tool
 
 
-API_VERSION = 1
+API_VERSION = 2
 
 
 class ExtensionAPI:
@@ -76,3 +86,62 @@ class ExtensionAPI:
 
     def add_panel(self, title, widget):
         return self._w.register_panel(title, widget)
+
+    # ------------------------------------------------------------ layers (API 2)
+    def layers(self):
+        d = self.current_document()
+        return list(d.layers) if d else []
+
+    def active_layer(self):
+        d = self.current_document()
+        return d.active if d else None
+
+    def new_layer(self, name=None, image=None, offset=None, label="New Layer"):
+        from PyQt6.QtCore import QPoint
+        d = self.current_document()
+        if d is None:
+            return None
+        return d.add_layer(name, imageops.to_working(image) if image is not None else None,
+                           offset or QPoint(0, 0), text=label)
+
+    def layer_image(self, layer=None):
+        d = self.current_document()
+        return d.layer_pixels(layer) if d else None
+
+    def set_layer_image(self, layer, image, label="Extension"):
+        """Replace a layer's pixels with a canvas-sized image, as one undoable step."""
+        d = self.current_document()
+        if d is None:
+            return False
+        img = imageops.to_working(image)
+        r = d.rect()
+        if img.size() != r.size():
+            raise ValueError("set_layer_image expects a canvas-sized image")
+        d.apply_patch(label, r, img, layer=layer or d.active)
+        return True
+
+    def composite(self):
+        d = self.current_document()
+        return d.flattened() if d else None
+
+    def add_canvas_overlay(self, fn):
+        """fn(painter, canvas): draw extra UI on the canvas. canvas.img_to_view() maps document → screen."""
+        self.ctx.canvas_overlays.append(fn)
+        cv = self.current_canvas()
+        if cv:
+            cv.viewport().update()
+        return fn
+
+    def remove_canvas_overlay(self, fn):
+        if fn in self.ctx.canvas_overlays:
+            self.ctx.canvas_overlays.remove(fn)
+
+    def refresh_canvas(self):
+        cv = self.current_canvas()
+        if cv:
+            cv.viewport().update()
+
+    def on(self, event, fn):
+        """Subscribe to 'layers_changed', 'document_changed' (pixels) or 'tool_changed'."""
+        self._w.ext_events.setdefault(event, []).append(fn)
+        return fn

@@ -215,7 +215,8 @@ class TestPublishingTools(unittest.TestCase):
         build_extensions.build(out=out, manifest_path=man, base_url="https://x/ext")
         data = read_json(man)
         self.assertEqual(data["extensions"][0]["sha256"], sha1)
-        self.assertEqual(os.listdir(out), ["basic-filters-1.0.0.zip"])
+        ver = read_json(os.path.join(ROOT, "extensions", "basic-filters", "manifest.json"))["version"]
+        self.assertEqual(os.listdir(out), [f"basic-filters-{ver}.zip"])
         fake = os.path.join(tmp, "LumenSetup-0.2.0.exe")
         write_bytes(fake, b"installer")
         app_entry = release.set_app(fake, "notes", man)
@@ -252,7 +253,7 @@ class TestExtensions(Base):
         self.assertTrue(60 < mid < 200, mid)                # edge is now soft
         self.assertEqual(d.image.pixelColor(2, 30).red(), 0)
         self.assertEqual(d.undo.text(d.undo.count() - 1), "Gaussian Blur")
-        self.assertIsNone(d.preview)
+        self.assertTrue(all(L.preview is None for L in d.layers))
         self.w.undo()
         self.assertEqual(d.image.pixelColor(40, 30).red(), 255)
         self.w.A["last_filter"].trigger()                   # Ctrl+Alt+F repeats it
@@ -267,7 +268,7 @@ class TestExtensions(Base):
         d.set_selection(p)
         self.patch(ext_ui.FilterDialog, "exec", lambda dlg: (dlg._preview(), 0)[1])   # preview then Cancel
         self.find_action("Image/Adjustments", "Threshold…").trigger()
-        self.assertIsNone(d.preview)
+        self.assertTrue(all(L.preview is None for L in d.layers))
         self.assertEqual(d.undo.count(), 1)  # only the selection
         self.patch(ext_ui.FilterDialog, "exec", lambda dlg: 1)
         self.w.ctx.set_fg(QColor(0, 0, 0))
@@ -288,13 +289,13 @@ class TestExtensions(Base):
 
     def test_extension_update_flow_and_banner(self):
         self.install()
-        self.gh.set_ext_version("basic-filters", "1.1.0")
+        self.gh.set_ext_version("basic-filters", "9.1.0")
         self.gh.publish()
         self.check()
         self.assertTrue(self.w.banner.isVisible())
         self.assertIn("1 extension update", self.w.banner.label.text())
         self.w.update_everything(None, self.w.checker.manifest.extension_updates(self.w.extensions.installed_versions()))
-        self.assertTrue(wait(lambda: self.w.extensions.items["basic-filters"].version == "1.1.0"))
+        self.assertTrue(wait(lambda: self.w.extensions.items["basic-filters"].version == "9.1.0"))
         self.assertTrue(self.w.extensions.restart_needed)
         self.assertTrue(wait(lambda: "Restart" in self.w.banner.label.text()
                              or "restart" in self.w.banner.label.text()))
@@ -302,10 +303,10 @@ class TestExtensions(Base):
     def test_auto_update_extensions_setting(self):
         self.install()
         self.w.ctx.settings.setValue("updates/auto_extensions", True)
-        self.gh.set_ext_version("basic-filters", "1.2.0")
+        self.gh.set_ext_version("basic-filters", "9.2.0")
         self.gh.publish()
         self.check()
-        self.assertTrue(wait(lambda: self.w.extensions.items["basic-filters"].version == "1.2.0"))
+        self.assertTrue(wait(lambda: self.w.extensions.items["basic-filters"].version == "9.2.0"))
 
     def test_sha_mismatch_is_rejected(self):
         self.gh.edit_manifest(lambda d: d["extensions"][0].__setitem__("sha256", "0" * 64))
@@ -317,7 +318,7 @@ class TestExtensions(Base):
         self.assertTrue(any("integrity" in str(b) for b in self.boxes))
 
     def test_incompatible_extension_not_installable(self):
-        self.gh.set_ext_version("basic-filters", "2.0.0", min_app="99.0.0")
+        self.gh.set_ext_version("basic-filters", "20.0.0", min_app="99.0.0")
         self.gh.publish()
         man = self.check()
         self.assertEqual(man.extension_updates({"basic-filters": "1.0.0"}), [])
@@ -413,6 +414,55 @@ def register(api):
         self.assertGreaterEqual(inst.count(), 2)            # one row + stretch
         dlg.grab().save(os.path.join(tempfile.gettempdir(), "lumen-ext-dialog.png"))
         dlg.close()
+
+
+class TestBuiltinExtensions(Base):
+    def setUp(self):
+        os.environ["LUMEN_BUNDLED_EXTENSIONS"] = os.path.join(ROOT, "extensions")
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+        os.environ["LUMEN_BUNDLED_EXTENSIONS"] = os.path.join(tempfile.gettempdir(), "lumen-no-bundled")
+
+    def test_filters_ship_with_the_app_and_work_offline(self):
+        ext = self.w.extensions.items["basic-filters"]
+        self.assertTrue(ext.builtin)
+        self.assertTrue(ext.loaded, ext.error)
+        cv = self.w.create_document(60, 40)
+        cv.doc.apply_region("s", QRect(0, 0, 30, 40), lambda p: p.fillRect(QRect(0, 0, 30, 40), QColor(0, 0, 0)))
+        blur = self.find_action("Filter/Blur", "Blur")
+        blur.trigger()
+        self.assertTrue(0 < cv.doc.image.pixelColor(30, 20).red() < 255)
+
+    def test_filters_on_large_image_regression(self):
+        """1.0.0 read freed memory: on big images every filter worked on a blank copy."""
+        cv = self.w.create_document(3000, 2000)
+        d = cv.doc
+        d.apply_region("s", QRect(0, 0, 1500, 2000), lambda p: p.fillRect(QRect(0, 0, 1500, 2000), QColor(0, 0, 0)))
+        self.patch(ext_ui.FilterDialog, "exec", lambda dlg: (dlg._preview(), 1)[1])
+        self.find_action("Filter/Blur", "Gaussian Blur…").trigger()
+        self.assertEqual(d.image.pixelColor(100, 1000).red(), 0)             # still black far from the edge
+        self.assertEqual(d.image.pixelColor(2900, 1000).red(), 255)          # still white
+        self.assertTrue(0 < d.image.pixelColor(1500, 1000).red() < 255)     # edge blurred
+        self.find_action("Image/Adjustments", "Threshold…").trigger()
+        v = d.image.pixelColor(1499, 1000).red()
+        self.assertIn(v, (0, 255))
+
+    def test_downloaded_update_overrides_builtin_and_revert(self):
+        self.gh.set_ext_version("basic-filters", "9.0.0")
+        self.gh.publish()
+        man = self.check()
+        self.w.install_extension(man.extensions["basic-filters"])
+        self.assertTrue(wait(lambda: self.w.extensions.items["basic-filters"].version == "9.0.0"))
+        self.assertTrue(self.w.extensions.items["basic-filters"].builtin)
+        self.assertTrue(self.w.extensions.restart_needed)
+        self.w.extensions.uninstall("basic-filters")        # "Revert" → back to the shipped version
+        ext = self.w.extensions.items["basic-filters"]
+        self.assertNotEqual(ext.version, "9.0.0")
+        self.w.extensions.uninstall("basic-filters")        # built-in can't be deleted: it's disabled
+        self.assertIn("basic-filters", self.w.extensions.items)
+        self.assertFalse(self.w.extensions.is_enabled("basic-filters"))
 
 
 class TestAppUpdates(Base):

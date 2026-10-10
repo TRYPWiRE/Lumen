@@ -25,8 +25,18 @@ class ExtensionError(Exception):
     pass
 
 
+def bundled_dir():
+    """Extensions shipped inside the app (installed copy or source checkout)."""
+    override = os.environ.get("LUMEN_BUNDLED_EXTENSIONS")
+    if override is not None:
+        return override
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(base, "extensions")
+
+
 class Installed:
-    def __init__(self, path, manifest):
+    def __init__(self, path, manifest, builtin=False):
+        self.builtin = builtin          # shipped with the app (can be updated, can't be deleted)
         self.path = path
         self.manifest = manifest
         self.id = manifest["id"]
@@ -59,28 +69,41 @@ def read_manifest(folder):
 class ExtensionManager(QObject):
     changed = pyqtSignal()
 
-    def __init__(self, settings, root=None, parent=None):
+    def __init__(self, settings, root=None, parent=None, bundled=None):
         super().__init__(parent)
         self.settings = settings
         self.root = root or config.extensions_dir()
+        self.bundled = bundled if bundled is not None else bundled_dir()
         self.items = {}            # id -> Installed
         self.restart_needed = False
         self.api_factory = None    # callable(ext) -> ExtensionAPI, set by the window
         self.scan()
 
     # ------------------------------------------------------------ discovery
+    def _candidates(self):
+        """id -> (folder, manifest, builtin); a downloaded copy wins over the built-in one if not older."""
+        out = {}
+        for base, builtin in ((self.bundled, True), (self.root, False)):
+            if not base or not os.path.isdir(base):
+                continue
+            for name in sorted(os.listdir(base)):
+                folder = os.path.join(base, name)
+                if name.startswith(".") or not os.path.isdir(folder):
+                    continue
+                try:
+                    m = read_manifest(folder)
+                except Exception:
+                    continue
+                prev = out.get(m["id"])
+                if prev is None or not versioning.is_newer(prev[1].get("version"), m.get("version")):
+                    out[m["id"]] = (folder, m, builtin or (prev is not None and prev[2]))
+        return out
+
     def scan(self):
         found = {}
-        for name in sorted(os.listdir(self.root)):
-            folder = os.path.join(self.root, name)
-            if name.startswith(".") or not os.path.isdir(folder):
-                continue
-            try:
-                m = read_manifest(folder)
-            except Exception:
-                continue
+        for ext_id, (folder, m, builtin) in sorted(self._candidates().items()):
             old = self.items.get(m["id"])
-            ext = Installed(folder, m)
+            ext = Installed(folder, m, builtin)
             if old is not None:  # keep runtime state across rescans
                 ext.loaded, ext.error, ext.module = old.loaded, old.error, old.module
                 if old.loaded and old.version != ext.version:
@@ -187,12 +210,17 @@ class ExtensionManager(QObject):
         return ext, hot
 
     def uninstall(self, ext_id):
+        """Remove a downloaded extension. Built-in ones go back to the shipped version (or get disabled)."""
         ext = self.items.get(ext_id)
         if not ext:
             return
+        user_copy = os.path.join(self.root, ext_id)
+        if ext.builtin and not os.path.isdir(user_copy):
+            self.set_enabled(ext_id, False)
+            return
         if ext.loaded:
             self.restart_needed = True
-        shutil.rmtree(ext.path, ignore_errors=True)
+        shutil.rmtree(user_copy, ignore_errors=True)
         self.scan()
 
     def download_task(self, entry):
