@@ -1,5 +1,11 @@
 {
-  "app": {},
+  "app": {
+    "version": "0.4.1",
+    "url": "https://github.com/TRYPWiRE/Lumen/releases/download/v0.4.1/LumenSetup-0.4.1.exe",
+    "sha256": "237d06151be08929854407f5714a1b7e2077ef6376b59e227b0598816ba06e9f",
+    "size": 148435846,
+    "notes": ""
+  },
   "extensions": [
     {
       "id": "adjustments",
@@ -9,8 +15,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/adjustments-1.0.0.zip",
-      "sha256": "b909017e5d8324991178a2b25e4b37b6da0385d08414c6d33462d624a9f0f941",
-      "size": 6811
+      "sha256": "a8d7262bf710d6095f86ffc5c92be969ba1d8f6ad2b45981710e57959d4891cb",
+      "size": 6856
     },
     {
       "id": "background-remover",
@@ -20,8 +26,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/background-remover-1.0.0.zip",
-      "sha256": "e2b9c38222197e76bb70ee4c4278c0b8d586730e854025b227644df25ba233e5",
-      "size": 11712,
+      "sha256": "979ccfa6ed367cd140cffb34d1bbb8fff787349cb8099efba59282ec31966afe",
+      "size": 11682,
       "requires": [
         "onnxruntime"
       ]
@@ -34,8 +40,8 @@
       "author": "Lumen",
       "min_app": "0.2.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/basic-filters-1.1.0.zip",
-      "sha256": "3fac65b61512311effa58ced0b2debeee9e19eeaf48782302823c3c6679abde2",
-      "size": 2653
+      "sha256": "aaf51bc03bd83674abe7e4a744aa970ed0dc6087476894a51f8aee68d77ec752",
+      "size": 2657
     },
     {
       "id": "creative-filters",
@@ -45,8 +51,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/creative-filters-1.0.0.zip",
-      "sha256": "08698c40de840a29ba4912718be9156d47e8b30678b414791fdd2b76203ec843",
-      "size": 6120
+      "sha256": "a89ea3c910165f865dc647344890eab2f69374ffe204c470bb8ca0c27b3dfb81",
+      "size": 6197
     },
     {
       "id": "layer-effects",
@@ -56,8 +62,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/layer-effects-1.0.0.zip",
-      "sha256": "0fa49221dfb0eda8407e76f2219cbe2b11441007b021aefa22107b65a6a1a158",
-      "size": 3771
+      "sha256": "8f460ad68ede60fc53b4aee3436a6d70a1a3df33d3b3bafba751dfe9e3273e60",
+      "size": 3803
     },
     {
       "id": "web-images-extractor",
@@ -67,8 +73,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/web-images-extractor-1.0.1.zip",
-      "sha256": "33dbec5cdedbef8b86beb790183930f5f36996ff3133cef0bd5d9640d9c896ed",
-      "size": 10847,
+      "sha256": "9e668e937ad5a3a35184438f37dc1308dc61b97df2317403d175eeeb7b2eb135",
+      "size": 10834,
       "requires": [
         "qtwebengine"
       ]

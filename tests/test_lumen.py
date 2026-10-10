@@ -167,6 +167,23 @@ class TestPainting(Base):
         self.assertEqual(self.px(50, 50).alpha(), 0)
         self.assertEqual(self.px(50, 10).alpha(), 255)
 
+    def test_brush_cursor_is_visible(self):
+        """The brush outline must show: a real cursor for normal sizes, a drawn outline for huge ones."""
+        t = self.tool("brush", size=20)
+        cur = self.cv.viewport().cursor()
+        self.assertEqual(cur.shape(), Qt.CursorShape.BitmapCursor)
+        self.assertGreaterEqual(cur.pixmap().width(), int(20 * self.cv.zoom))
+        self.key(Qt.Key.Key_BracketRight)                       # resizing updates the cursor
+        self.assertGreater(self.cv.viewport().cursor().pixmap().width(), cur.pixmap().width())
+        t.set_opt("size", 400)
+        self.send(QEvent.Type.MouseMove, (100, 75), button=NONE, buttons=NONE)
+        img = self.cv.viewport().grab().toImage()
+        c = self.cv.img_to_view(QPointF(100, 75))
+        ring = img.pixelColor(int(c.x() + 400 * self.cv.zoom / 2), int(c.y()))
+        self.assertNotEqual((ring.red(), ring.green(), ring.blue()), (255, 255, 255))
+        self.tool("eraser", size=30)
+        self.assertEqual(self.cv.viewport().cursor().shape(), Qt.CursorShape.BitmapCursor)
+
     def test_brush_size_shortcuts(self):
         t = self.tool("brush", size=20)
         self.key(Qt.Key.Key_BracketRight)

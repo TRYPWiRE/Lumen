@@ -1,0 +1,8 @@
+{
+  "id": "creative-filters",
+  "name": "Creative Filters",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Photoshop's creative filter menu: Motion & Radial Blur, Twirl, Pinch, Spherize, Ripple, Wave, Polar Coordinates, Median, Dust & Scratches, Color Halftone, Crystallize, Clouds, Vignette, Emboss, Find Edges, Oil Paint, Solarize, Diffuse, High Pass, Minimum/Maximum and Offset.",
+  "min_app": "0.4.0"
+}

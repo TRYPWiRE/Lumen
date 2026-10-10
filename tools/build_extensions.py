@@ -86,6 +86,9 @@ def build(only=None, src=SRC, out=OUT, manifest_path=MANIFEST, base_url=None):
             "min_app": m.get("min_app", ""), "url": f"{base_url}/{fname}",
             "sha256": sha256(dest), "size": os.path.getsize(dest),
         }
+        reqs = [r if isinstance(r, str) else r.get("id") for r in m.get("requires", []) or []]
+        if reqs:
+            entries[m["id"]]["requires"] = [r for r in reqs if r]
         built.append(f"{m['id']} {m['version']}")
     data["extensions"] = list(entries.values())
     save_manifest(data, manifest_path)

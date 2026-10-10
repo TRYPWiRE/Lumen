@@ -4,7 +4,7 @@ import sys
 from PyQt6.QtCore import Qt, QSize, QTimer, QPoint, QPointF, QRect, QRectF, QEvent, pyqtSignal
 from PyQt6.QtGui import (QIcon, QAction, QKeySequence, QImage, QImageReader, QImageWriter, QPainter, QColor,
                          QUndoGroup, QTransform, QGuiApplication, QPainterPath, QShortcut, QPen, QPolygonF)
-from PyQt6.QtWidgets import (QProgressDialog, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QToolBar,
+from PyQt6.QtWidgets import (QTabBar, QProgressDialog, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QToolBar,
                              QToolButton, QLabel, QStackedWidget, QSplitter, QFileDialog, QMessageBox,
                              QMenu, QSizePolicy, QPushButton, QListWidget, QListWidgetItem, QApplication,
                              QDialog, QTextBrowser)
@@ -301,8 +301,27 @@ class MainWindow(QMainWindow):
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(0)
         cl.addWidget(self.banner)
-        cl.addWidget(split, 1)
+        self.workspace_stack = QStackedWidget()
+        self.workspace_stack.addWidget(split)
+        cl.addWidget(self.workspace_stack, 1)
         self.setCentralWidget(central)
+        # workspace tabs ("Lumen" + any extension workspaces) — hidden until an extension adds one
+        self.ws_bar = QToolBar("Workspaces")
+        self.ws_bar.setObjectName("WorkspaceBar")
+        self.ws_bar.setMovable(False)
+        self.ws_bar.setFloatable(False)
+        self.ws_tabs = QTabBar()
+        self.ws_tabs.setObjectName("WorkspaceTabs")
+        self.ws_tabs.setDrawBase(False)
+        self.ws_tabs.setExpanding(False)
+        self.ws_tabs.setIconSize(QSize(16, 16))
+        self.ws_tabs.addTab(icons.icon("layers", 16), "Lumen")
+        self.ws_tabs.currentChanged.connect(self._workspace_changed)
+        self.ws_bar.addWidget(self.ws_tabs)
+        self.insertToolBar(self.options_bar, self.ws_bar)
+        self.insertToolBarBreak(self.options_bar)
+        self.ws_bar.hide()
+        self.workspaces = [("Lumen", split)]
         self._refresh_welcome()
 
     def _build_status(self):
@@ -475,16 +494,18 @@ class MainWindow(QMainWindow):
         for gid, names, _ in TOOL_GROUPS:
             for n in names:
                 by_key.setdefault(self.ctx.tools[n].key, gid)
+        sc = self.lumen_shortcuts = []          # only active on the Lumen workspace tab
         for key, gid in by_key.items():
-            QShortcut(QKeySequence(key), self, activated=lambda g=gid: self.set_tool(self.group_buttons[g].current.name))
-            QShortcut(QKeySequence("Shift+" + key), self, activated=lambda g=gid: self.cycle_group(g))
-        QShortcut(QKeySequence("X"), self, activated=self.ctx.swap_colors)
-        QShortcut(QKeySequence("D"), self, activated=self.ctx.default_colors)
-        QShortcut(QKeySequence("["), self, activated=lambda: self.adjust_size(-1))
-        QShortcut(QKeySequence("]"), self, activated=lambda: self.adjust_size(1))
-        QShortcut(QKeySequence("Return"), self, activated=self._enter)
-        QShortcut(QKeySequence("Enter"), self, activated=self._enter)
-        QShortcut(QKeySequence("Escape"), self, activated=self._escape)
+            sc.append(QShortcut(QKeySequence(key), self,
+                                activated=lambda g=gid: self.set_tool(self.group_buttons[g].current.name)))
+            sc.append(QShortcut(QKeySequence("Shift+" + key), self, activated=lambda g=gid: self.cycle_group(g)))
+        sc.append(QShortcut(QKeySequence("X"), self, activated=self.ctx.swap_colors))
+        sc.append(QShortcut(QKeySequence("D"), self, activated=self.ctx.default_colors))
+        sc.append(QShortcut(QKeySequence("["), self, activated=lambda: self.adjust_size(-1)))
+        sc.append(QShortcut(QKeySequence("]"), self, activated=lambda: self.adjust_size(1)))
+        sc.append(QShortcut(QKeySequence("Return"), self, activated=self._enter))
+        sc.append(QShortcut(QKeySequence("Enter"), self, activated=self._enter))
+        sc.append(QShortcut(QKeySequence("Escape"), self, activated=self._escape))
 
         self.undo_group.canUndoChanged.connect(self._update_actions)
         self.undo_group.canRedoChanged.connect(self._update_actions)
@@ -643,7 +664,7 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "A"):
             return
         doc = self.current_doc()
-        has = doc is not None
+        has = doc is not None and (not hasattr(self, "workspace_stack") or self.workspace_stack.currentIndex() == 0)
         for k in ("close", "close_all", "save", "save_as", "export", "cut", "copy", "copy_merged", "clear", "fill_fg",
                   "fill_bg", "invert", "desat", "image_size", "canvas_size", "rot180", "rot90", "rot270", "fliph",
                   "flipv", "sel_all", "deselect", "sel_inv", "zin", "zout", "fit", "100", "new_layer",
@@ -890,7 +911,18 @@ class MainWindow(QMainWindow):
         if not self.close_all():
             ev.ignore()
             return
+        self.shutdown_workspaces()
         ev.accept()
+
+    def shutdown_workspaces(self):
+        """Let extension workspaces release what they hold (e.g. web pages) before Qt shuts down."""
+        for _, w in getattr(self, "workspaces", [])[1:]:
+            fn = getattr(w, "shutdown", None)
+            if fn:
+                try:
+                    fn()
+                except Exception:
+                    pass
 
     # ---------------------------------------------------------------- recent
     def recent_files(self):
@@ -1394,7 +1426,11 @@ class MainWindow(QMainWindow):
                                                               else " — restart Lumen to apply"), 6000)
             except Exception as e:
                 QMessageBox.warning(self, "Lumen", f"Couldn't install {entry.get('name', entry['id'])}.\n\n{e}")
+                ext = None
             self._update_actions()
+            if ext is not None and ext.missing_runtimes and not self.extensions.restart_needed:
+                self.ensure_runtimes(ext, then=then)
+                return
             if then:
                 then()
 
@@ -1429,7 +1465,150 @@ class MainWindow(QMainWindow):
             return None
         self.statusBar().showMessage(f"Installed {ext.name} {ext.version}", 6000)
         self._update_actions()
+        if ext.missing_runtimes:
+            self.ensure_runtimes(ext)
         return ext
+
+    # ---------------------------------------------------------------- runtime packs
+    def runtime_entry(self, rid):
+        man = self.checker.manifest
+        if man is None:
+            return None
+        return man.runtime(rid)
+
+    def ensure_runtimes(self, ext, then=None):
+        """Download any runtime packs `ext` still needs (once), then load it."""
+        from . import runtimes
+        missing = [r for r in ext.missing_runtimes]
+
+        def finish():
+            if self.extensions.load(ext):
+                self.statusBar().showMessage(f"{ext.name} is ready.", 6000)
+            elif ext.error:
+                QMessageBox.warning(self, "Lumen", f"{ext.name} couldn't start.\n\n{ext.error}")
+            self.extensions.changed.emit()
+            self._update_actions()
+            if then:
+                then()
+
+        def step():
+            if not missing:
+                return finish()
+            rid = missing.pop(0)
+            entry = self.runtime_entry(rid)
+            if entry is None:
+                if self.checker.manifest is None and not self.checker.busy:
+                    # we haven't fetched the manifest yet: do it, then retry
+                    missing.insert(0, rid)
+                    self.checker.checked.connect(_retry)
+                    self.checker.failed.connect(_retry_fail)
+                    self.checker.check()
+                    return
+                QMessageBox.warning(self, "Lumen", f"{ext.name} needs “{rid}”, which isn't available to download "
+                                    "yet. Check your connection, or try again later.")
+                return finish()
+            task = runtimes.download_task(rid, entry)
+            prog = self._progress(f"Downloading {runtimes.describe(entry, rid)} for {ext.name}…\n"
+                                  "This only happens once.")
+            prog.canceled.connect(task.cancel)
+            task.progress.connect(lambda d, t: prog.setValue(int(d * 100 / t)) if t else prog.setRange(0, 0))
+
+            def ok(path):
+                prog.setLabelText(f"Installing {entry.get('name', rid)}…")
+                QApplication.processEvents()
+                try:
+                    runtimes.install_zip(rid, path)
+                    runtimes.activate(rid)
+                except Exception as e:
+                    prog.close()
+                    QMessageBox.warning(self, "Lumen", f"Couldn't install {entry.get('name', rid)}.\n\n{e}")
+                    return finish()
+                finally:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+                prog.close()
+                step()
+
+            def fail(msg):
+                prog.close()
+                if msg != "Cancelled":
+                    QMessageBox.warning(self, "Lumen", f"Couldn't download {entry.get('name', rid)}.\n\n{msg}")
+                finish()
+            task.succeeded.connect(ok)
+            task.failed.connect(fail)
+            task.start()
+
+        def _retry(*_):
+            self._disconnect_retry(_retry, _retry_fail)
+            step()
+
+        def _retry_fail(*_):
+            self._disconnect_retry(_retry, _retry_fail)
+            missing.pop(0) if missing else None
+            QMessageBox.warning(self, "Lumen", "Couldn't reach GitHub to download what this extension needs.")
+            finish()
+        step()
+
+    def _disconnect_retry(self, a, b):
+        for sig, fn in ((self.checker.checked, a), (self.checker.failed, b)):
+            try:
+                sig.disconnect(fn)
+            except (TypeError, RuntimeError):
+                pass
+
+    # ---------------------------------------------------------------- workspaces
+    def register_workspace(self, title, widget, icon_name=None):
+        self.workspace_stack.addWidget(widget)
+        self.workspaces.append((title, widget))
+        ic = icons.icon(icon_name, 16) if icon_name in icons.DRAWINGS else QIcon()
+        self.ws_tabs.addTab(ic, title)
+        self.ws_bar.setVisible(len(self.workspaces) > 1)
+        return len(self.workspaces) - 1
+
+    def show_workspace(self, widget_or_index):
+        i = widget_or_index if isinstance(widget_or_index, int) else \
+            next((n for n, (_, w) in enumerate(self.workspaces) if w is widget_or_index), 0)
+        self.ws_tabs.setCurrentIndex(i)
+
+    def _workspace_changed(self, i):
+        self.workspace_stack.setCurrentIndex(i)
+        lumen = i == 0
+        self.options_bar.setVisible(lumen)
+        self.toolbox.setVisible(lumen)
+        for shortcut in self.lumen_shortcuts:
+            shortcut.setEnabled(lumen)
+        self._update_actions()
+        title = self.workspaces[i][0] if 0 <= i < len(self.workspaces) else "Lumen"
+        if not lumen:
+            self.setWindowTitle(f"{title} — Lumen")
+        else:
+            self._tab_changed(self.docs.currentIndex())
+        self._emit_ext("workspace_changed", i)
+
+    # ---------------------------------------------------------------- images coming from extensions
+    def open_image_document(self, img, name=None):
+        img = imageops.to_working(img)
+        doc = Document(img, name=name or None, transparent=img.hasAlphaChannel())
+        cv = self.add_document(doc)
+        self.show_workspace(0)
+        return cv
+
+    def add_image_as_layer(self, img, name=None, show=False):
+        """Add img to the current document as a new layer, centred (new document if none is open)."""
+        img = imageops.to_working(img)
+        cv = self.current_canvas()
+        if cv is None:
+            cv = self.open_image_document(img, name)
+            return cv.doc.active
+        d = cv.doc
+        d.commit_floating()
+        pos = QPoint((d.width - img.width()) // 2, (d.height - img.height()) // 2)
+        L = d.add_layer(d.next_layer_name() if not name else name[:60], img, pos, text="Place Image")
+        if show:
+            self.show_workspace(0)
+        return L
 
     def update_app(self, entry):
         if not updates.can_self_update():

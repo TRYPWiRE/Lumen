@@ -116,6 +116,9 @@ class Canvas(QAbstractScrollArea):
         self.viewport().update()
         self.zoomChanged.emit(self.zoom)
         self.viewChanged.emit()
+        tool = self.ctx.tool
+        if getattr(tool, "brush_outline", False):
+            self.refresh_cursor()
 
     def zoom_step(self, direction, anchor=None):
         z = self.zoom
@@ -227,8 +230,8 @@ class Canvas(QAbstractScrollArea):
             except Exception as e:  # never let an extension break painting
                 self.ctx.status.emit(f"Canvas overlay error: {e}")
             p.restore()
-            if self.mouse_view is not None and getattr(tool, "brush_outline", False):
-                self._draw_brush_cursor(p, tool)
+        if self.mouse_view is not None and getattr(tool, "brush_outline", False):
+            self._draw_brush_cursor(p, tool)
         p.end()
 
     def _draw_pixel_grid(self, p, vis, o, z):
@@ -260,7 +263,12 @@ class Canvas(QAbstractScrollArea):
         p.drawPath(path)
 
     def _draw_brush_cursor(self, p, tool):
+        """Brushes up to CURSOR_MAX px on screen use a real OS cursor (see tools.brush_cursor);
+        bigger ones get their outline drawn here."""
+        from .tools import CURSOR_MAX
         size = max(1.0, tool.opts.get("size", 1)) * self.zoom
+        if size <= CURSOR_MAX:
+            return
         c = self.mouse_view
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setBrush(Qt.BrushStyle.NoBrush)

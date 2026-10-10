@@ -116,7 +116,14 @@ def flood_mask(img: QImage, x: int, y: int, tolerance: int, contiguous=True) -> 
     mask = similar_mask(img, x, y, tolerance)
     if not contiguous:
         return mask
+    return flood_region(mask, x, y)
+
+
+def flood_region(mask: np.ndarray, x: int, y: int) -> np.ndarray:
+    """The connected part of boolean `mask` reachable from (x, y) (4-connected, scanline runs)."""
     h, w = mask.shape
+    if not (0 <= x < w and 0 <= y < h) or not mask[y, x]:
+        return np.zeros_like(mask)
     out = np.zeros_like(mask)
     runs = {}
     visited = {}

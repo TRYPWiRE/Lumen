@@ -2,7 +2,7 @@
 import math
 import numpy as np
 from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QPointF, QLineF, QSize
-from PyQt6.QtGui import (QPainter, QColor, QPen, QBrush, QPainterPath, QCursor, QFont,
+from PyQt6.QtGui import (QPainter, QColor, QPen, QBrush, QPainterPath, QCursor, QFont, QPixmap,
                          QFontMetricsF, QLinearGradient, QRadialGradient, QImage, QPolygonF)
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QCheckBox, QComboBox, QFontComboBox,
                              QToolButton, QSpinBox, QButtonGroup, QPushButton)
@@ -34,6 +34,34 @@ def drag_rect(a: QPointF, b: QPointF, square=False, centred=False) -> QRectF:
     if centred:
         return QRectF(a.x() - dx, a.y() - dy, 2 * dx, 2 * dy).normalized()
     return QRectF(a.x(), a.y(), dx, dy).normalized()
+
+
+CURSOR_MAX = 180   # largest brush outline (screen px) drawn as a real OS cursor
+
+
+def brush_cursor(diameter):
+    """Photoshop-style brush cursor: the brush outline (black + white so it shows on anything)
+    with a small cross-hair in the middle."""
+    d = max(1.0, diameter)
+    side = int(max(d, 15) + 6)
+    if side % 2 == 0:
+        side += 1
+    pm = QPixmap(side, side)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    c = QPointF(side / 2, side / 2)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    if d >= 5:
+        for col, w in ((QColor(0, 0, 0, 200), 3.0), (QColor(255, 255, 255, 240), 1.2)):
+            p.setPen(QPen(col, w))
+            p.drawEllipse(c, d / 2, d / 2)
+    for col, w in ((QColor(0, 0, 0, 200), 3.0), (QColor(255, 255, 255, 240), 1.2)):
+        p.setPen(QPen(col, w))
+        p.drawLine(c + QPointF(-4, 0), c + QPointF(4, 0))
+        p.drawLine(c + QPointF(0, -4), c + QPointF(0, 4))
+    p.end()
+    return QCursor(pm, side // 2, side // 2)
 
 
 class Tool:
@@ -71,6 +99,8 @@ class Tool:
             ctl.blockSignals(False)
         cv = self.ctx.current_canvas()
         if cv:
+            if key == "size" and self.brush_outline and self.ctx.tool is self:
+                cv.refresh_cursor()
             cv.viewport().update()
 
     def options_widget(self):
@@ -157,7 +187,10 @@ class StrokeTool(Tool):
         self._last_end = {}
 
     def cursor(self, canvas):
-        return QCursor(Qt.CursorShape.BlankCursor)
+        d = max(1.0, self.opts.get("size", 1)) * canvas.zoom
+        if d <= CURSOR_MAX:
+            return brush_cursor(d)
+        return brush_cursor(1)          # outline too big for a cursor: canvas draws it, keep the cross-hair
 
     def build_options(self, lay):
         self.spin(lay, "size", "Size", 1, 2500, " px")

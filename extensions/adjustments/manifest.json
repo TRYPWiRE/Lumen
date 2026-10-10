@@ -1,0 +1,8 @@
+{
+  "id": "adjustments",
+  "name": "Adjustments Pro",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Photoshop's core adjustments: Levels, Curves, Exposure, Vibrance, Hue/Saturation, Color Balance, Black & White, Photo Filter, Gradient Map, Shadows/Highlights, Equalize, plus Auto Tone, Auto Contrast and Auto Color.",
+  "min_app": "0.4.0"
+}

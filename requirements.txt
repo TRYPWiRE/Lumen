@@ -1,2 +1,4 @@
-PyQt6>=6.5
+# Exact Qt versions: the runtime packs (tools/build_runtimes.py) must match them.
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.2
 numpy>=1.24

@@ -71,6 +71,15 @@ QToolButton:checked {{ background: {PRESSED}; border: 1px solid #111; }}
 QToolButton#ToolButton {{ padding: 4px; }}
 QToolButton#ModeButton:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}
 
+QToolBar#WorkspaceBar {{ background: {BG_DARK}; border-bottom: 1px solid {BORDER}; padding: 0 8px; spacing: 0; }}
+QTabBar#WorkspaceTabs {{ background: transparent; }}
+QTabBar#WorkspaceTabs::tab {{
+    background: transparent; color: {TEXT_DIM}; border: none; border-bottom: 2px solid transparent;
+    padding: 7px 18px 6px 14px; margin-right: 2px; min-width: 0px; font-weight: 600;
+}}
+QTabBar#WorkspaceTabs::tab:selected {{ color: white; border-bottom: 2px solid {ACCENT}; background: {BG}; }}
+QTabBar#WorkspaceTabs::tab:hover:!selected {{ color: {TEXT}; background: #2f2f2f; }}
+
 /* ---------- inputs ---------- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QFontComboBox {{
     background: {INPUT};

@@ -21,10 +21,21 @@ class Manifest:
     def __init__(self, data: dict):
         self.raw = data or {}
         self.app = dict(self.raw.get("app") or {})
+        self.runtimes = dict(self.raw.get("runtimes") or {})
         self.extensions = {}
         for e in self.raw.get("extensions") or []:
             if isinstance(e, dict) and e.get("id") and e.get("url"):
                 self.extensions[e["id"]] = dict(e)
+
+    def runtime(self, rid):
+        """Download entry for a runtime pack on this platform (packs are per-OS)."""
+        from .runtimes_platform import platform_key
+        e = self.runtimes.get(rid)
+        if not isinstance(e, dict):
+            return None
+        if "url" in e:
+            return e
+        return e.get(platform_key())
 
     def app_update(self, current=__version__):
         v = self.app.get("version")

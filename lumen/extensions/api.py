@@ -15,6 +15,11 @@
         api.composite()                           # flattened image of the visible layers
         api.add_canvas_overlay(fn)                # fn(painter, canvas) draws on top of the canvas
         api.on("layers_changed", fn) / api.on("document_changed", fn) / api.on("tool_changed", fn)
+
+    Workspaces (API 3):
+        api.add_workspace("My Tool", widget)      # adds a top tab next to "Lumen"
+        api.add_image_as_layer(qimage, "Name")    # hand pictures back to Lumen
+        api.ask_params("Title", params, preview)  # settings dialog with live preview
 """
 from PyQt6.QtGui import QAction, QKeySequence
 
@@ -22,7 +27,7 @@ from .. import __version__, imageops
 from ..tools import Tool
 
 
-API_VERSION = 2
+API_VERSION = 3
 
 
 class ExtensionAPI:
@@ -70,14 +75,51 @@ class ExtensionAPI:
         self._w.register_extension_action(a)
         return a
 
-    def add_filter(self, path, text, fn, params=None, shortcut=None):
+    def add_filter(self, path, text, fn, params=None, shortcut=None, dialog_hook=None):
         """fn(QImage, **params) -> QImage. With params, a dialog with live preview is shown.
-        params: list of dicts {key, label, min, max, default, suffix?, decimals?}"""
+        params: list of dicts {key, label, default, type?} — see ui.ParamsDialog for the types.
+        dialog_hook(dialog) can add custom widgets (dialog.extra layout, dialog.extra_values)."""
         from .ui import run_filter
 
         def go():
-            run_filter(self._w, text.rstrip("…. "), fn, params or [])
+            run_filter(self._w, text.rstrip("…. "), fn, params or [], dialog_hook)
         return self.add_menu_action(path, text, go, shortcut)
+
+    def ask_params(self, title, params, preview=None, ok_text="OK"):
+        """Show a settings dialog. preview(values or None) is called live. Returns values or None."""
+        from .ui import ParamsDialog
+        dlg = ParamsDialog(self._w, title, params, on_change=preview, ok_text=ok_text)
+        return dlg.values() if dlg.exec() else None
+
+    # ------------------------------------------------------------ workspaces (API 3)
+    def add_workspace(self, title, widget, icon=None):
+        """Add a top-level tab next to "Lumen" (e.g. a browser or a dedicated tool)."""
+        return self._w.register_workspace(title, widget, icon)
+
+    def show_workspace(self, widget):
+        self._w.show_workspace(widget)
+
+    def show_lumen(self):
+        self._w.show_workspace(0)
+
+    def add_image_as_layer(self, image, name=None, show=False):
+        """Place an image in the current document as a new layer (opens a new document if none)."""
+        return self._w.add_image_as_layer(image, name, show)
+
+    def open_image(self, image, name=None):
+        """Open an image as a new document and switch to Lumen."""
+        return self._w.open_image_document(image, name)
+
+    def data_dir(self, sub=""):
+        """A folder this extension can keep files in (models, caches…)."""
+        import os
+        from .. import config
+        d = os.path.join(config.data_dir(), "ext-data", self.id, sub)
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    def window(self):
+        return self._w
 
     # ------------------------------------------------------------ tools / panels
     def add_tool(self, tool_cls, group=None):

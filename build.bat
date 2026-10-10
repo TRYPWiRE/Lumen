@@ -12,7 +12,7 @@ for /f "delims=" %%v in ('python -c "import lumen; print(lumen.__version__)"') d
 echo Building Lumen %VER%
 
 echo === 3/5  Building the app (PyInstaller) ===
-python -m PyInstaller --noconfirm --clean --windowed --name Lumen --icon assets\lumen.ico --add-data "assets;assets" --add-data "extensions;extensions" main.py || goto :error
+python tools\build_app.py || goto :error
 
 echo === 4/5  Building the installer (Inno Setup) ===
 set ISCC=

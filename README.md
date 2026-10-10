@@ -1,4 +1,4 @@
-# Lumen v0.3
+# Lumen v0.4.1
 
 A Photoshop-style image editor written in Python with PyQt6.
 
@@ -10,6 +10,44 @@ python main.py
 ```
 
 You can also pass image paths on the command line (`python main.py photo.jpg`) or drag files onto the window.
+
+## New in v0.4.1
+
+- **Splash screen.** It shows for about a second while Lumen loads, then fades into the app. Start Lumen
+  with `--no-splash` to skip it.
+
+## New in v0.4
+
+- **Brush cursor fixed.** Brush, Pencil and Eraser show the brush outline as the actual mouse pointer, like
+  Photoshop. Very large brushes get a drawn outline plus a crosshair.
+- **Workspace tabs.** Extensions can add their own top-level tab next to **Lumen**. The tab bar only appears
+  once you install one. Lumen's tools and shortcuts switch off while another tab is in front, so typing
+  never triggers tool shortcuts.
+- **New extensions** (install them from *Plugins ▸ Extensions… ▸ Browse*):
+  - **Web Images Extractor:** a browser with tabs in its own workspace. *Collect* or *Scroll + Collect* every
+    image a page shows, including lazy-loaded images, CSS backgrounds and og:image. Filter out small icons.
+    Then send any image to Lumen with **Add as Layer**, select several and add them in one step, open one as
+    a new document, or save it (original file, PNG, JPEG or WebP).
+  - **Background Remover:** its own workspace with AI subject detection (U²-Net, three models), a magic
+    wand, erase/restore brushes, *clear from the edges*, and soften/tighten/grow edges. Use **Use Active
+    Layer** to bring a layer in, then **Apply to the Original Layer** or **Add as New Layer** to send the
+    result back. It also adds **Layer ▸ Remove Background** and **Select ▸ Subject**, like Photoshop.
+  - **Adjustments Pro:**
+    - Levels (Ctrl+L), Curves (Ctrl+M, with a curve editor), Exposure, Vibrance and Hue/Saturation (Ctrl+U).
+    - Color Balance (Ctrl+B), Black & White, Photo Filter, Gradient Map, Shadows/Highlights and Equalize.
+    - Auto Tone, Auto Contrast and Auto Color.
+  - **Creative Filters:**
+    - Motion and Radial Blur.
+    - Twirl, Pinch, Spherize, Ripple, Wave and Polar Coordinates.
+    - Median and Dust & Scratches.
+    - Color Halftone and Crystallize.
+    - Clouds, Difference Clouds and Vignette.
+    - Emboss, Find Edges, Oil Paint, Solarize and Diffuse.
+    - High Pass, Minimum, Maximum and Offset.
+  - **Layer Effects:** Drop Shadow, Outer Glow, Inner Shadow, Inner Glow, Stroke, Color Overlay, Gradient
+    Overlay and Bevel & Emboss. Each one goes on its own layer and has a live preview.
+- **Runtime packs.** The browser engine (134 MB) and the AI engine (14 MB) aren't part of the installer.
+  The extensions that need them download them once, from GitHub Releases, when you install the extension.
 
 ## New in v0.3
 
@@ -63,7 +101,7 @@ Run `run_tests.bat`, or:
 python -m unittest discover tests -v
 ```
 
-There are 105 tests. They drive the real window with simulated mouse and keyboard input, covering every tool, undo/redo, file save/load and the image commands. They also include speed checks.
+There are 125 tests. They drive the real window with simulated mouse and keyboard input, covering every tool, undo/redo, file save/load and the image commands. They also include speed checks.
 
 ## Build the installer
 

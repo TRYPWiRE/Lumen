@@ -1,0 +1,8 @@
+{
+  "id": "layer-effects",
+  "name": "Layer Effects",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Photoshop-style layer styles — Drop Shadow, Outer Glow, Inner Shadow, Inner Glow, Stroke, Color Overlay, Gradient Overlay and Bevel & Emboss — each created on its own layer with a live preview (Layer ▸ Layer Style).",
+  "min_app": "0.4.0"
+}

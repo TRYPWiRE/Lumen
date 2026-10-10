@@ -16,10 +16,13 @@ os.environ["LUMEN_SETTINGS"] = os.path.join(_tmp, "settings.ini")
 os.environ["LUMEN_DATA_DIR"] = os.path.join(_tmp, "data")
 os.environ["LUMEN_BUNDLED_EXTENSIONS"] = os.path.join(_tmp, "no-bundled")   # tests opt in explicitly
 
+from PyQt6.QtCore import Qt as _Qt, QCoreApplication as _QCA  # noqa: E402
+_QCA.setAttribute(_Qt.ApplicationAttribute.AA_ShareOpenGLContexts)   # same as main.py (WebEngine)
+
 # Hide harmless messages from the offscreen platform so real failures are easy to spot.
 from PyQt6.QtCore import qInstallMessageHandler  # noqa: E402
 
-_QUIET = ("propagateSizeHints", "does not support raise", "grabbing the keyboard", "grabbing the mouse")
+_QUIET = ("setting window opacity", "propagateSizeHints", "does not support raise", "grabbing the keyboard", "grabbing the mouse")
 
 
 def _qt_messages(mode, context, message):

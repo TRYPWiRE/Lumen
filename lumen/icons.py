@@ -402,6 +402,47 @@ def d_layers(p, c):
         p.drawPolygon(_poly((12, 4 + dy), (21, 9 + dy), (12, 14 + dy), (3, 9 + dy)))
 
 
+def d_globe(p, c):
+    p.setPen(_pen(c, 1.4))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawEllipse(QPointF(12, 12), 8.5, 8.5)
+    p.drawEllipse(QRectF(8, 3.5, 8, 17))
+    p.drawLine(QPointF(3.5, 12), QPointF(20.5, 12))
+    p.drawLine(QPointF(5, 7.5), QPointF(19, 7.5))
+    p.drawLine(QPointF(5, 16.5), QPointF(19, 16.5))
+
+
+def d_cutout(p, c):
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(c.red(), c.green(), c.blue(), 90))
+    for x in range(3):
+        for y in range(3):
+            if (x + y) % 2 == 0:
+                p.drawRect(QRectF(3 + x * 6, 3 + y * 6, 6, 6))
+    p.setBrush(c)
+    p.drawEllipse(QPointF(12, 9), 3.5, 3.5)
+    path = QPainterPath(QPointF(5.5, 21))
+    path.cubicTo(QPointF(6, 14), QPointF(18, 14), QPointF(18.5, 21))
+    path.closeSubpath()
+    p.drawPath(path)
+
+
+def d_wand(p, c):
+    p.setPen(_pen(c, 2.0))
+    p.drawLine(QPointF(4, 20), QPointF(14, 10))
+    p.setPen(_pen(c, 1.3))
+    for a, b in (((17, 3), (17, 7)), ((15, 5), (19, 5)), ((20, 9), (20, 12)), ((18.5, 10.5), (21.5, 10.5)),
+                 ((11, 4), (11, 6)), ((10, 5), (12, 5))):
+        p.drawLine(QPointF(*a), QPointF(*b))
+
+
+def d_restore(p, c):
+    d_brush(p, c)
+    p.setPen(_pen(c, 1.4))
+    p.drawLine(QPointF(17, 16), QPointF(23, 16))
+    p.drawLine(QPointF(20, 13), QPointF(20, 19))
+
+
 DRAWINGS = {k[2:]: v for k, v in dict(globals()).items() if k.startswith("d_")}
 
 

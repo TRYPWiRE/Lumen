@@ -16,7 +16,7 @@ import zipfile
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from .. import __version__, config, net, versioning
+from .. import __version__, config, net, versioning, runtimes
 
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
 
@@ -48,6 +48,17 @@ class Installed:
         self.loaded = False
         self.error = None
         self.module = None
+        self.missing_runtimes = []
+
+    def requirements(self):
+        """[(runtime id, [modules it provides])] declared in manifest.json "requires"."""
+        out = []
+        for r in self.manifest.get("requires", []) or []:
+            if isinstance(r, str):
+                out.append((r, []))
+            elif isinstance(r, dict) and r.get("id"):
+                out.append((r["id"], list(r.get("provides", []))))
+        return out
 
     def compatible(self):
         return versioning.compatible(self.min_app, __version__)
@@ -94,6 +105,8 @@ class ExtensionManager(QObject):
                     m = read_manifest(folder)
                 except Exception:
                     continue
+                if builtin and not m.get("builtin"):
+                    continue          # only extensions marked "builtin" ship inside the app
                 prev = out.get(m["id"])
                 if prev is None or not versioning.is_newer(prev[1].get("version"), m.get("version")):
                     out[m["id"]] = (folder, m, builtin or (prev is not None and prev[2]))
@@ -138,6 +151,10 @@ class ExtensionManager(QObject):
 
     # ------------------------------------------------------------ loading
     def load_all(self):
+        try:
+            runtimes.finish_pending()
+        except OSError:
+            pass
         for ext in self.items.values():
             if self.is_enabled(ext.id) and not ext.loaded:
                 self.load(ext)
@@ -148,6 +165,17 @@ class ExtensionManager(QObject):
             return True
         if not ext.compatible():
             ext.error = f"Needs Lumen {ext.min_app} or newer"
+            return False
+        ext.missing_runtimes = []
+        for rid, provides in ext.requirements():
+            try:
+                if not runtimes.satisfied(rid, provides):
+                    ext.missing_runtimes.append(rid)
+            except runtimes.RuntimeError_ as e:
+                ext.missing_runtimes.append(rid)
+                ext.error = str(e)
+        if ext.missing_runtimes:
+            ext.error = ext.error or "Needs a one-time download: " + ", ".join(ext.missing_runtimes)
             return False
         mod_name = "lumen_ext_" + re.sub(r"[^a-zA-Z0-9_]", "_", ext.id)
         try:

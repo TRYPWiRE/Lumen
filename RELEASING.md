@@ -21,6 +21,24 @@ installer/lumen.iss                <- Inno Setup script
    To use a different repo name, change `GITHUB_OWNER` / `GITHUB_REPO` in `lumen/config.py` and the URLs in
    `installer/lumen.iss` first.
 
+## Runtime packs (one-time setup, and again whenever Qt changes)
+
+Web Images Extractor needs Qt's web engine, and Background Remover needs onnxruntime. Those are too big
+for the installer, so they're published as **runtime packs** on a GitHub pre-release tagged `runtimes`.
+
+1. Run `publish_runtimes.bat`. It downloads the official wheels, keeps exactly the libraries Lumen.exe
+   doesn't already contain, zips them and uploads them. It then adds the packs to `updates/manifest.json`
+   and pushes that.
+2. The packs must match the Qt version inside Lumen.exe. Those versions are pinned in `requirements.txt`.
+   If you ever change them, rebuild the app **and** run `publish_runtimes.bat` again.
+
+The first time someone installs one of these extensions, Lumen downloads its pack (checking the SHA-256),
+unpacks it to `%APPDATA%\Lumen\runtimes` and keeps it from then on.
+
+To check an installed copy, run `Lumen.exe --check-extensions` with `LUMEN_CHECK_OUTPUT=report.txt` set.
+It loads every extension and runtime pack (it even starts the web engine) and writes the results to that
+file.
+
 ## Releasing a new app version
 
 1. Raise `__version__` in `lumen/__init__.py` (for example `0.3.0`).
@@ -64,6 +82,23 @@ def register(api):
     api.add_tool(MyTool)            # subclass api.Tool; group="brush" puts it in an existing slot
     api.add_panel("My Panel", widget)
 ```
+
+Extensions can add a whole workspace tab, and pass images back to Lumen (API version 3):
+
+```python
+def register(api):
+    page = MyWidget(api)
+    api.add_workspace("My Tool", page, icon="globe")   # a new tab next to "Lumen"
+    api.add_image_as_layer(qimage, "Name")             # place it in the current document
+    api.open_image(qimage, "Name")                     # or open it as a new document
+    values = api.ask_params("Title", params, preview)  # settings dialog with live preview
+    api.data_dir("models")                             # a folder for the extension's own files
+```
+
+If an extension needs a big library, declare it in `manifest.json` as
+`"requires": [{"id": "qtwebengine", "provides": ["PyQt6.QtWebEngineWidgets"]}]` (or `"onnxruntime"`).
+Lumen downloads the pack before loading the extension. Extensions marked `"builtin": true` ship inside the
+installer; every other extension is downloaded from the Browse tab.
 
 Extensions can also work with layers and draw on the canvas (API version 2):
 

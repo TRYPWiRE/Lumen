@@ -28,6 +28,8 @@ from lumen import theme, versioning, updates, config, __version__  # noqa: E402
 from lumen import mainwindow as mw_mod  # noqa: E402
 from lumen.extensions import ExtensionManager, ExtensionError  # noqa: E402
 from lumen.extensions import ui as ext_ui  # noqa: E402
+
+_MISSING = object()
 import build_extensions  # noqa: E402
 import release  # noqa: E402
 
@@ -141,12 +143,18 @@ class Base(unittest.TestCase):
         return w
 
     def patch(self, obj, name, value):
-        self.patches.append((obj, name, getattr(obj, name)))
+        # remember whether the attribute was the object's own, so tearDown can put things back exactly
+        # (copying an inherited Qt method onto a subclass breaks it for later tests)
+        own = name in getattr(obj, "__dict__", {})
+        self.patches.append((obj, name, getattr(obj, name) if own else _MISSING))
         setattr(obj, name, value)
 
     def tearDown(self):
         for obj, name, old in reversed(self.patches):
-            setattr(obj, name, old)
+            if old is _MISSING:
+                delattr(obj, name)
+            else:
+                setattr(obj, name, old)
         for w in list(getattr(self, "_windows", [])) + [self.w]:
             while w.docs.count():
                 w.docs.widget(0).doc.undo.setClean()
@@ -211,18 +219,19 @@ class TestPublishingTools(unittest.TestCase):
         tmp = tempfile.mkdtemp()
         out, man = os.path.join(tmp, "ext"), os.path.join(tmp, "manifest.json")
         build_extensions.build(out=out, manifest_path=man, base_url="https://x/ext")
-        sha1 = read_json(man)["extensions"][0]["sha256"]
+        sha_of = lambda data: next(e for e in data["extensions"] if e["id"] == "basic-filters")["sha256"]
+        sha1 = sha_of(read_json(man))
         build_extensions.build(out=out, manifest_path=man, base_url="https://x/ext")
         data = read_json(man)
-        self.assertEqual(data["extensions"][0]["sha256"], sha1)
+        self.assertEqual(sha_of(data), sha1)
         ver = read_json(os.path.join(ROOT, "extensions", "basic-filters", "manifest.json"))["version"]
-        self.assertEqual(os.listdir(out), [f"basic-filters-{ver}.zip"])
+        self.assertIn(f"basic-filters-{ver}.zip", os.listdir(out))
         fake = os.path.join(tmp, "LumenSetup-0.2.0.exe")
         write_bytes(fake, b"installer")
         app_entry = release.set_app(fake, "notes", man)
         self.assertEqual(app_entry["version"], __version__)
         self.assertTrue(app_entry["url"].endswith(f"/releases/download/v{__version__}/LumenSetup-0.2.0.exe"))
-        self.assertEqual(read_json(man)["extensions"][0]["sha256"], sha1)  # extensions untouched
+        self.assertEqual(sha_of(read_json(man)), sha1)  # extensions untouched
 
     def test_repo_manifest_is_valid(self):
         data = read_json(os.path.join(ROOT, "updates", "manifest.json"))
@@ -309,7 +318,8 @@ class TestExtensions(Base):
         self.assertTrue(wait(lambda: self.w.extensions.items["basic-filters"].version == "9.2.0"))
 
     def test_sha_mismatch_is_rejected(self):
-        self.gh.edit_manifest(lambda d: d["extensions"][0].__setitem__("sha256", "0" * 64))
+        self.gh.edit_manifest(lambda d: next(e for e in d["extensions"] if e["id"] == "basic-filters")
+                              .__setitem__("sha256", "0" * 64))
         man = self.check()
         done = []
         self.w.install_extension(man.extensions["basic-filters"], then=lambda: done.append(1))

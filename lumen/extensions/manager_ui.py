@@ -210,8 +210,17 @@ class ExtensionsDialog(QDialog):
             have = self.mgr.items.get(e["id"])
             compat = versioning.compatible(e.get("min_app"), __version__)
             status = "" if compat else f"Needs Lumen {e.get('min_app')} or newer"
+            extra = []
+            for rid in e.get("requires", []) or []:
+                from .. import runtimes
+                rt = man.runtime(rid) if man else None
+                if not runtimes.installed_ok(rid) and not runtimes.importable(
+                        {"qtwebengine": "PyQt6.QtWebEngineWidgets"}.get(rid, rid)):
+                    extra.append(runtimes.describe(rt, rid) if rt else rid)
+            if extra and compat:
+                status = "Also downloads once: " + ", ".join(extra)
             row = _Row(e.get("name", e["id"]), e.get("version", "?"), e.get("author", ""), e.get("description", ""),
-                       status, "#ffcc80")
+                       status, "#ffcc80" if not compat else "#9ab8d8")
             if have and not versioning.is_newer(e.get("version"), have.version):
                 row.add_button("Installed", lambda: None, enabled=False)
             elif have:

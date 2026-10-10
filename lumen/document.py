@@ -767,16 +767,19 @@ class Document(QObject):
 
     def select_layer_pixels(self, layer):
         """Ctrl+click a layer thumbnail: load its transparency as a selection."""
-        import numpy as np
         reg = layer.region(self.rect())
-        a = imageops.view(reg)[..., 3] >= 128
+        self.selection_from_mask(imageops.view(reg)[..., 3] >= 128, "Load Selection")
+
+    def selection_from_mask(self, a, text="Selection"):
+        """Select the True pixels of a canvas-sized boolean array."""
+        import numpy as np
         path = QPainterPath()
         for y in np.flatnonzero(a.any(axis=1)):
             row = a[y]
-            edges = np.flatnonzero(np.diff(np.concatenate(([0], row.view(np.int8), [0]))))
+            edges = np.flatnonzero(np.diff(np.concatenate(([0], row.astype(np.int8), [0]))))
             for s, e in zip(edges[::2], edges[1::2]):
                 path.addRect(QRectF(int(s), int(y), int(e - s), 1))
-        self.set_selection(path.simplified(), "Load Selection")
+        self.set_selection(path.simplified(), text)
 
     # ------------------------------------------------------------ floating (Move tool)
     def lift_selection(self, label="Move"):
