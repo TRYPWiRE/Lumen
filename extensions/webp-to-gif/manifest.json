@@ -1,0 +1,9 @@
+{
+  "id": "webp-to-gif",
+  "name": "WebP to GIF",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Batch-convert WebP files (animated or still) to GIF in their own tab, with Quality, Frames and Width controls, target-size presets, a live preview of each result, and Open in Lumen (frames as layers).",
+  "min_app": "0.6.0",
+  "requires": [{"id": "pillow", "provides": ["PIL"]}]
+}

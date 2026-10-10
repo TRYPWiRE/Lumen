@@ -1,7 +1,7 @@
 {
   "id": "background-remover",
   "name": "Background Remover",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Lumen",
   "description": "Cut subjects out of their background in a dedicated tab: AI subject detection (U²-Net), a magic wand, erase/restore brushes and edge clean-up. Also adds Layer ▸ Remove Background and Select ▸ Subject.",
   "min_app": "0.4.0",

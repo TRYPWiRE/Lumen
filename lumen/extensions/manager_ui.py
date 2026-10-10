@@ -9,13 +9,12 @@ from .. import __version__, theme, versioning, icons
 class UpdateBanner(QFrame):
     """Slim notification strip: message + action buttons + close."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, tint=None):
         super().__init__(parent)
         self.setObjectName("Banner")
-        self.setStyleSheet(f"""
-            QFrame#Banner {{ background: #1d3b5e; border-bottom: 1px solid {theme.BORDER}; }}
-            QFrame#Banner QLabel {{ color: #e8f1ff; }}
-        """)
+        self.tint = tint            # None = the theme's accent colour
+        self._restyle()
+        theme.notifier.changed.connect(self._restyle)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(12, 5, 6, 5)
         lay.setSpacing(8)
@@ -47,17 +46,25 @@ class UpdateBanner(QFrame):
             self.buttons.addWidget(b)
         self.show()
 
+    def _restyle(self, *_):
+        c = theme.C
+        bg = theme.mix(self.tint or c["accent"], c["window"], 0.68)
+        self.setStyleSheet(f"""
+            QFrame#Banner {{ background: {bg}; border-bottom: 1px solid {c['border']}; }}
+            QFrame#Banner QLabel {{ color: {c['text_strong']}; }}
+        """)
+
 
 class _Row(QFrame):
     def __init__(self, title, version, author, desc, status="", status_color=None):
         super().__init__()
-        self.setStyleSheet(f"QFrame {{ background: {theme.BG}; border-bottom: 1px solid #262626; }}"
+        self.setStyleSheet(f"QFrame {{ background: {theme.C['window']}; border-bottom: 1px solid {theme.C['border']}; }}"
                            "QLabel { border: none; background: transparent; }")
         lay = QHBoxLayout(self)
         lay.setContentsMargins(14, 10, 12, 10)
         text = QVBoxLayout()
         text.setSpacing(2)
-        top = QLabel(f"<b style='color:white;font-size:13px'>{title}</b>"
+        top = QLabel(f"<b style='color:{theme.C["text_strong"]};font-size:13px'>{title}</b>"
                      f"&nbsp;&nbsp;<span style='color:{theme.TEXT_DIM}'>v{version}"
                      f"{' · ' + author if author else ''}</span>")
         text.addWidget(top)
@@ -69,7 +76,7 @@ class _Row(QFrame):
         if status:
             s = QLabel(status)
             s.setWordWrap(True)
-            s.setStyleSheet(f"color: {status_color or '#7fb4ff'};")
+            s.setStyleSheet(f"color: {status_color or theme.tone('info')};")
             text.addWidget(s)
         lay.addLayout(text, 1)
         self.actions = QHBoxLayout()
@@ -97,7 +104,8 @@ class ExtensionsDialog(QDialog):
         lay.setSpacing(0)
 
         head = QWidget()
-        head.setStyleSheet(f"background: {theme.BG_DARK};")
+        head.setObjectName("SidePane")
+        head.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         hl = QHBoxLayout(head)
         hl.setContentsMargins(18, 14, 14, 14)
         t = QVBoxLayout()
@@ -126,8 +134,7 @@ class ExtensionsDialog(QDialog):
         self.tabs.addTab(self.available_list[0], "Browse")
         lay.addWidget(self.tabs, 1)
 
-        self.restart = UpdateBanner()
-        self.restart.setStyleSheet(self.restart.styleSheet().replace("#1d3b5e", "#4a3a12"))
+        self.restart = UpdateBanner(tint="#e0a030")
         lay.addWidget(self.restart)
 
         self.mgr.changed.connect(self.refresh)
@@ -178,7 +185,7 @@ class ExtensionsDialog(QDialog):
             enabled = self.mgr.is_enabled(ext.id)
             status, color = "", None
             if ext.error:
-                status, color = f"⚠ {ext.error}", "#ff8a80"
+                status, color = f"⚠ {ext.error}", theme.tone("error")
             elif not enabled:
                 status, color = "Disabled", theme.TEXT_DIM
             remote = avail.get(ext.id)
@@ -187,7 +194,7 @@ class ExtensionsDialog(QDialog):
                 ok = versioning.compatible(remote.get("min_app"), __version__)
                 status = (f"Update available: v{remote['version']}" if ok
                           else f"v{remote['version']} available — needs Lumen {remote.get('min_app')}")
-                color = None if ok else "#ffcc80"
+                color = None if ok else theme.tone("warn")
             author = (ext.author + " · " if ext.author else "") + ("Built-in" if ext.builtin else "")
             row = _Row(ext.name, ext.version, author.strip(" ·"), ext.description, status, color)
             if update and versioning.compatible(remote.get("min_app"), __version__):
@@ -220,7 +227,7 @@ class ExtensionsDialog(QDialog):
             if extra and compat:
                 status = "Also downloads once: " + ", ".join(extra)
             row = _Row(e.get("name", e["id"]), e.get("version", "?"), e.get("author", ""), e.get("description", ""),
-                       status, "#ffcc80" if not compat else "#9ab8d8")
+                       status, theme.tone("warn") if not compat else theme.tone("muted"))
             if have and not versioning.is_newer(e.get("version"), have.version):
                 row.add_button("Installed", lambda: None, enabled=False)
             elif have:

@@ -1,4 +1,4 @@
-# Lumen v0.4.1
+# Lumen v0.6.0
 
 A Photoshop-style image editor written in Python with PyQt6.
 
@@ -10,6 +10,62 @@ python main.py
 ```
 
 You can also pass image paths on the command line (`python main.py photo.jpg`) or drag files onto the window.
+
+## New in v0.6
+
+Every tool from the File Converter is now a Lumen extension with its own tab. Install them from
+*Plugins ▸ Extensions… ▸ Browse*. Each one also works with your Lumen documents: open results as documents
+or as layers (animation frames become one layer each), or feed the open picture into a tool.
+
+- **Batch Converter:** convert and resize images in batches to PNG, JPEG, WebP, AVIF, BMP, GIF, TIFF and ICO.
+  It reads almost anything, including PSD, HEIC and camera RAW (Canon, Nikon, Sony, Fuji, Panasonic, Olympus,
+  Pentax and more).
+  - Add files, or a whole folder.
+  - Social-media output sizes (Fit, Fill or Stretch), with a quality setting for JPEG, WebP and AVIF.
+  - Animated GIFs and WebPs stay animated.
+  - Save files one at a time, or use **Download All** to save next to the originals or into another folder.
+  - Lumen's own **File ▸ Open** now reads HEIC, AVIF and camera RAW, and **Save As** writes GIF, AVIF and ICO.
+- **Video to GIF:** pick the start, length, frame rate (5–30 fps) and width, then press **Generate Preview**
+  to see the real GIF and its exact file size before saving. Also saves animated WebP. Works with MP4, MOV,
+  MKV, WebM, AVI and more.
+- **GIF Optimiser:** shrink a GIF with a Compression slider, or press a target: **Discord Emoji**
+  (128 px, under 256 KB), **Discord Sticker** (exactly 320×320, under 512 KB), 1–500 MiB or a custom size.
+  Original and result play side by side.
+- **Image Optimiser:** the same for still images, from a file or straight from Lumen
+  (*File ▸ Export ▸ Optimise for Web…*).
+- **WebP to GIF:** convert batches of WebPs with Quality, Frames and Width controls plus target sizes.
+- **Video to Image:** scrub through a video frame by frame, zoom the slider in for precise picking, then
+  save, copy, open the frame in Lumen or add it as a layer. Can also export a run of frames (every Nth)
+  as PNGs or layers.
+- **WebP Flipbook:** turns animated WebPs and sprite sheets into GIFs.
+  - Detects the frame grid automatically and shows it over the sheet, with an animation preview.
+  - Keeps transparent backgrounds.
+  - Can also export PNG frames, or open the frames as layers in Lumen.
+- **Overlay Studio:** put one image over another, and animated GIFs/WebPs keep moving.
+  - Drag the top image, or snap it to one of 9 positions, then scale it and set its opacity.
+  - Either image can come straight from Lumen.
+  - Save as PNG, GIF, WebP or AVIF, or open the result in Lumen.
+- Every tool has an **Options** menu with *Delete original files after saving* and *Show file names after
+  saving* (a list with Copy buttons). You can also drop files onto any tool.
+- **Downloads:** these tools need Pillow, which downloads once (about 7 MB) the first time you install one.
+  HEIC and camera RAW support downloads (about 8 MB) only when you first open such a file. The video
+  decoder is built into Lumen.
+
+## New in v0.5
+
+- **Themes.** A new **Themes** menu restyles the whole of Lumen live: every panel, menu, icon and dialog.
+  - **Themes ▸ Presets:** 13 built-in looks, each with a preview: Lumen Dark (the classic look), Graphite,
+    Silver, Daylight, Midnight, OLED Black, Frost, Nightshade, Synthwave, Ember, Forest, Sakura and
+    High Contrast.
+  - **Themes ▸ Create Theme…:** start from any theme, then change any of the 24 interface colours with a
+    live preview. *Quick start* builds a whole theme from just a background, text and accent colour, and a
+    readability check warns when text gets hard to read. **Save Theme** adds it to **Themes ▸ My Themes**.
+  - **Edit Current Theme…**, **Import Theme…** / **Export Current Theme…** (`.lumentheme` files you can
+    share), **Delete Current Theme** and **Reset to Lumen Dark**.
+  - Your choice is remembered on every start-up and survives updates. Saved themes are kept in your user
+    folder (`%APPDATA%\Lumen\themes`), not the install folder.
+- Extensions can read the theme's colours (`api.theme_colors()`) and react to `api.on("theme_changed", …)`
+  (extension API 4). Web Images Extractor 1.0.2 and Background Remover 1.0.1 follow the theme.
 
 ## New in v0.4.1
 

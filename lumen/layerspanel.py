@@ -85,7 +85,8 @@ class LayerList(QWidget):
 
     def paintEvent(self, ev):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(theme.BG))
+        C = theme.C
+        p.fillRect(self.rect(), QColor(C["window"]))
         d = self.doc()
         if not d:
             return
@@ -96,13 +97,13 @@ class LayerList(QWidget):
             r = QRect(0, i * ROW_H, self.width(), ROW_H)
             active = L is d.active
             if active:
-                p.fillRect(r, QColor("#4f4f4f"))
-            p.setPen(QColor("#262626"))
+                p.fillRect(r, QColor(C["selection"]))
+            p.setPen(QColor(C["border"]))
             p.drawLine(r.bottomLeft(), r.bottomRight())
             p.drawLine(EYE_W, r.top(), EYE_W, r.bottom())
             # eye
             if L.visible:
-                p.drawPixmap(EYE_W // 2 - 8, r.top() + ROW_H // 2 - 8, icons.pixmap("eye", 16, QColor("#cfcfcf")))
+                p.drawPixmap(EYE_W // 2 - 8, r.top() + ROW_H // 2 - 8, icons.pixmap("eye", 16, QColor(C["icon"])))
             # thumbnail
             tr = self.thumb_rect(i)
             if L.is_text:
@@ -120,25 +121,25 @@ class LayerList(QWidget):
                 pr.moveCenter(tr.center())
                 p.drawPixmap(pr.topLeft(), pm)
                 tr = pr
-            p.setPen(QPen(QColor("#ffffff" if active else "#1b1b1b"), 1))
+            p.setPen(QPen(QColor(C["text_strong"] if active else C["border"]), 1))
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawRect(tr.adjusted(-1, -1, 0, 0))
             # name
             nr = self.name_rect(i)
             p.setFont(italic if L.background else f)
-            p.setPen(QColor("#ffffff" if active else theme.TEXT) if L.visible else QColor("#8a8a8a"))
+            p.setPen(QColor(C["text_strong"] if active else C["text"]) if L.visible else QColor(C["text_dim"]))
             name = QFontMetrics(p.font()).elidedText(L.name, Qt.TextElideMode.ElideRight, nr.width())
             p.drawText(nr, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, name)
             p.setFont(f)
             # lock
             if L.background or L.lock_all or L.lock_alpha or L.lock_pixels or L.lock_position:
                 full = L.background or L.lock_all
-                col = QColor("#d0d0d0") if full else QColor("#8c8c8c")
+                col = QColor(C["icon"]) if full else QColor(C["text_dim"])
                 p.drawPixmap(self.width() - 22, r.top() + ROW_H // 2 - 7, icons.pixmap("lock", 14, col))
         # drop indicator
         if self._drag_to is not None:
             y = self._drag_to * ROW_H
-            p.setPen(QPen(QColor(theme.ACCENT), 2))
+            p.setPen(QPen(QColor(C["accent"]), 2))
             p.drawLine(0, y, self.width(), y)
 
     # ------------------------------------------------------------ mouse
@@ -298,8 +299,8 @@ class LayersPanel(QWidget):
         sa.setWidget(self.list)
         lay.addWidget(sa, 1)
 
-        bottom = QWidget()
-        bottom.setStyleSheet(f"background: {theme.BG}; border-top: 1px solid #232323;")
+        bottom = QFrame()
+        bottom.setObjectName("PanelFooter")
         bl = QHBoxLayout(bottom)
         bl.setContentsMargins(6, 3, 6, 3)
         bl.addStretch(1)

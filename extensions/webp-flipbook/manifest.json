@@ -1,0 +1,9 @@
+{
+  "id": "webp-flipbook",
+  "name": "WebP Flipbook",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Turn animated WebPs and flipbook / sprite-sheet images into animated GIFs in their own tab, with automatic grid detection, a grid overlay, an animation preview, transparency kept, PNG frame export, and frames-as-layers in Lumen.",
+  "min_app": "0.6.0",
+  "requires": [{"id": "pillow", "provides": ["PIL"]}]
+}

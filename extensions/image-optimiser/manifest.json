@@ -1,0 +1,9 @@
+{
+  "id": "image-optimiser",
+  "name": "Image Optimiser",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Shrink a still image in its own tab: Compression slider, Discord Emoji / Sticker presets, 1-500 MiB targets and social-media sizes. Works on files or straight from the picture open in Lumen.",
+  "min_app": "0.6.0",
+  "requires": [{"id": "pillow", "provides": ["PIL"]}]
+}

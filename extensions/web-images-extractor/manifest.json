@@ -1,7 +1,7 @@
 {
   "id": "web-images-extractor",
   "name": "Web Images Extractor",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Lumen",
   "description": "A built-in web browser in its own tab. Browse any page, collect every image it shows (lazy-loaded ones too), then add them to your Lumen project as layers, open them as documents or save them.",
   "min_app": "0.4.0",

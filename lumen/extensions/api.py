@@ -20,20 +20,32 @@
         api.add_workspace("My Tool", widget)      # adds a top tab next to "Lumen"
         api.add_image_as_layer(qimage, "Name")    # hand pictures back to Lumen
         api.ask_params("Title", params, preview)  # settings dialog with live preview
+
+    Themes (API 4):
+        api.theme_colors()                        # {"window": "#323232", "accent": …} - see lumen/theme.py TOKENS
+        api.on("theme_changed", fn)               # fn(theme) after the user switches theme
+
+    Files & conversion tools (API 5):
+        api.media                                 # lumen.media: shared converter widgets, workers, GIF encoder…
+        api.add_file_reader((".heic",), "HEIC images", fn)   # File ▸ Open can now read them: fn(path) -> QImage
+        api.add_file_writer("gif", "GIF", fn)     # Save As / Export As can write them: fn(qimage, path, doc)
+        api.open_layers([qimage, …], "Name")      # new document, one layer per image (e.g. animation frames)
+        api.ensure_runtime(["pillow"], then)      # download a runtime pack now (once), then(ok)
 """
 from PyQt6.QtGui import QAction, QKeySequence
 
-from .. import __version__, imageops
+from .. import __version__, imageops, media
 from ..tools import Tool
 
 
-API_VERSION = 3
+API_VERSION = 5
 
 
 class ExtensionAPI:
     API_VERSION = API_VERSION
     Tool = Tool                 # base class for extension tools
     imageops = imageops         # numpy <-> QImage helpers
+    media = media               # shared building blocks for conversion tools (API 5)
 
     def __init__(self, window, ext):
         self._w = window
@@ -183,7 +195,45 @@ class ExtensionAPI:
         if cv:
             cv.viewport().update()
 
+    # ------------------------------------------------------------ files & conversion (API 5)
+    def add_file_reader(self, exts, label, fn):
+        """Let File ▸ Open read more formats. exts: ('.heic', '.heif'); fn(path) -> QImage."""
+        exts = tuple(e.lower() if e.startswith(".") else "." + e.lower() for e in exts)
+        self._w.file_readers.append((exts, label, fn))
+
+    def add_file_writer(self, ext, label, fn):
+        """Let Save As / Export As write another format. fn(flattened QImage, path, document)."""
+        self._w.file_writers[ext.lower().lstrip(".")] = (label, fn)
+
+    def open_layers(self, images, name=None, layer_names=None):
+        """Open a new document with one layer per QImage (bottom → top) and switch to Lumen."""
+        return self._w.open_layers_document(images, name, layer_names)
+
+    def runtime_ready(self, rid, modules=None):
+        """True when runtime pack `rid` (or the modules it provides) can be imported now."""
+        from .. import runtimes
+        try:
+            return runtimes.satisfied(rid, modules)
+        except Exception:
+            return False
+
+    def ensure_runtime(self, rids, then=None, for_what=None):
+        """Download runtime packs (once) that aren't installed yet, then call then(ok)."""
+        rids = [rids] if isinstance(rids, str) else list(rids)
+        missing = [r for r in rids if not self.runtime_ready(r)]
+        if not missing:
+            if then:
+                then(True)
+            return
+        self._w.download_runtimes(missing, for_what or self.ext.name, then)
+
+    def theme_colors(self):
+        """The current theme's colours as a dict of '#rrggbb' strings (keys: lumen.theme.KEYS)."""
+        from .. import theme
+        return dict(theme.C)
+
     def on(self, event, fn):
-        """Subscribe to 'layers_changed', 'document_changed' (pixels) or 'tool_changed'."""
+        """Subscribe to 'layers_changed', 'document_changed' (pixels), 'tool_changed', 'workspace_changed'
+        or 'theme_changed'."""
         self._w.ext_events.setdefault(event, []).append(fn)
         return fn

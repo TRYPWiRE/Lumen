@@ -240,6 +240,26 @@ class TestPublishingTools(unittest.TestCase):
         self.assertTrue(e["url"].startswith(config.RAW_BASE))
         zp = os.path.join(ROOT, "updates", "extensions", os.path.basename(e["url"]))
         self.assertEqual(build_extensions.sha256(zp), e["sha256"])
+        for ext_id, e in m.extensions.items():          # every listed zip exists and matches its hash
+            zp = os.path.join(ROOT, "updates", "extensions", os.path.basename(e["url"]))
+            self.assertTrue(os.path.isfile(zp), f"{ext_id}: {zp} is missing")
+            self.assertEqual(build_extensions.sha256(zp), e["sha256"],
+                             f"{ext_id}: zip doesn't match updates/manifest.json - run tools/build_extensions.py")
+
+    def test_extension_zips_are_the_same_on_every_computer(self):
+        """Stored (not compressed), fixed dates and a fixed 'made on' OS: Windows and Linux build identical zips."""
+        import zipfile
+        tmp = tempfile.mkdtemp()
+        a, b = os.path.join(tmp, "a.zip"), os.path.join(tmp, "b.zip")
+        src = os.path.join(ROOT, "extensions", "basic-filters")
+        build_extensions.zip_folder(src, a)
+        build_extensions.zip_folder(src, b)
+        self.assertEqual(build_extensions.sha256(a), build_extensions.sha256(b))
+        with zipfile.ZipFile(a) as z:
+            for info in z.infolist():
+                self.assertEqual(info.compress_type, zipfile.ZIP_STORED)
+                self.assertEqual(info.create_system, 3)
+                self.assertEqual(info.date_time, (1980, 1, 1, 0, 0, 0))
 
 
 class TestExtensions(Base):

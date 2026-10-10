@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo === 1/5  Installing requirements ===
-python -m pip install -r requirements.txt pyinstaller || goto :error
+python -m pip install -r requirements.txt -r requirements-dev.txt pyinstaller || goto :error
 
 echo === 2/5  Running tests ===
 python -m unittest discover tests || goto :error

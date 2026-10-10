@@ -1,0 +1,9 @@
+{
+  "id": "overlay-studio",
+  "name": "Overlay Studio",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Place one image over another in its own tab - animated GIFs and WebPs keep moving. Drag or snap the forefront to 9 positions, scale it, fade it, and save as PNG, GIF, WebP or AVIF, or open the result in Lumen. Either image can come straight from Lumen.",
+  "min_app": "0.6.0",
+  "requires": [{"id": "pillow", "provides": ["PIL"]}]
+}

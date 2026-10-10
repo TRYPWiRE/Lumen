@@ -7,10 +7,40 @@ from PyQt6.QtGui import QPixmap, QGuiApplication, QAction, QImage, QDesktopServi
 from PyQt6.QtWidgets import (QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QToolButton, QMenu,
                              QScrollArea, QGridLayout, QComboBox, QCheckBox, QFileDialog, QMessageBox, QSizePolicy)
 
+from lumen import theme
+
 from . import fetcher as F
 
 CARD_W = 220
 SIZE_FILTERS = [("All sizes", 0), ("64 px and up", 64), ("200 px and up", 200), ("500 px and up", 500)]
+
+
+def _colors():
+    """Theme colours (falls back to the classic dark look on Lumen versions without the theme engine)."""
+    c = dict(getattr(theme, "C", {}) or {})
+    c.setdefault("window", theme.BG)
+    c.setdefault("header", theme.BG_DARK)
+    c.setdefault("input_border", theme.INPUT_BORDER)
+    c.setdefault("accent", theme.ACCENT)
+    c.setdefault("pasteboard", theme.PASTEBOARD)
+    c.setdefault("text_strong", "#e6e6e6")
+    c.setdefault("text_dim", theme.TEXT_DIM)
+    c.setdefault("hover", theme.HOVER)
+    return c
+
+
+def _mix(a, b, t):
+    from PyQt6.QtGui import QColor
+    a, b = QColor(a), QColor(b)
+    return QColor(round(a.red() + (b.red() - a.red()) * t), round(a.green() + (b.green() - a.green()) * t),
+                  round(a.blue() + (b.blue() - a.blue()) * t)).name()
+
+
+def on_theme_changed(slot):
+    """Call slot() whenever the user switches theme (no-op on older Lumen versions)."""
+    n = getattr(theme, "notifier", None)
+    if n is not None:
+        n.changed.connect(slot)
 
 
 class _Bridge(QObject):
@@ -26,11 +56,8 @@ class Card(QFrame):
         self.frames = 1
         self.setObjectName("ImageCard")
         self.setFixedWidth(CARD_W)
-        self.setStyleSheet("""
-            QFrame#ImageCard { background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 8px; }
-            QFrame#ImageCard[checked="true"] { border: 1px solid #2680eb; background: #23324a; }
-            QLabel#Preview { background: #1d1d1d; border-radius: 5px; }
-        """)
+        self._restyle()
+        on_theme_changed(self._restyle)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(6)
@@ -40,7 +67,7 @@ class Card(QFrame):
         self.check.toggled.connect(self._checked)
         top.addWidget(self.check)
         self.info = QLabel(f"Image {index + 1}")
-        self.info.setStyleSheet("font-weight: 600; color: #e6e6e6;")
+        self.info.setObjectName("CardTitle")
         top.addWidget(self.info, 1)
         lay.addLayout(top)
         self.preview = QLabel("Loading…")
@@ -83,6 +110,16 @@ class Card(QFrame):
         more.setMenu(menu)
         row.addWidget(more)
         lay.addLayout(row)
+
+    def _restyle(self, *_):
+        c = _colors()
+        card = _mix(c["window"], c["header"], 0.8)
+        self.setStyleSheet(f"""
+            QFrame#ImageCard {{ background: {card}; border: 1px solid {c['input_border']}; border-radius: 8px; }}
+            QFrame#ImageCard[checked="true"] {{ border: 1px solid {c['accent']}; background: {_mix(card, c['accent'], 0.18)}; }}
+            QLabel#Preview {{ background: {_mix(c['pasteboard'], card, 0.3)}; border-radius: 5px; }}
+            QLabel#CardTitle {{ font-weight: 600; color: {c['text_strong']}; }}
+        """)
 
     def _checked(self, on):
         self.setProperty("checked", "true" if on else "false")

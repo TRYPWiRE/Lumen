@@ -165,7 +165,38 @@ def build_onnxruntime(plat, work):
             "provides": ["onnxruntime"], "python_paths": ["lib"], "dll_dirs": [capi]}
 
 
-BUILDERS = {"qtwebengine": build_qtwebengine, "onnxruntime": build_onnxruntime}
+def _wheel_pack(plat, work, packages, skip=("numpy-",)):
+    """Unzip pip wheels (with their dependencies, minus what Lumen already has) into pack/lib."""
+    wheels = os.path.join(work, "wheels")
+    pip_download(packages, wheels, plat, deps=True)
+    lib = os.path.join(work, "pack", "lib")
+    versions_ = {}
+    for whl in sorted(glob.glob(os.path.join(wheels, "*.whl"))):
+        name = os.path.basename(whl).lower()
+        if name.startswith(tuple(skip)):
+            continue
+        unzip_wheel(whl, lib)
+        versions_[name.split("-")[0]] = name.split("-")[1]
+    return versions_
+
+
+def build_pillow(plat, work):
+    v = _wheel_pack(plat, work, ["pillow"])
+    return {"id": "pillow", "name": "Imaging library (Pillow)", "version": v.get("pillow", "0"), "platform": plat,
+            "provides": ["PIL"], "python_paths": ["lib"], "dll_dirs": []}
+
+
+def build_camera_formats(plat, work):
+    # Pillow comes from its own pack; numpy is already in Lumen
+    v = _wheel_pack(plat, work, ["pillow-heif", "rawpy"], skip=("numpy-", "pillow-"))
+    version = f"{v.get('pillow_heif', '0')}+{v.get('rawpy', '0')}"
+    return {"id": "camera-formats", "name": "HEIC + camera RAW support", "version": version, "platform": plat,
+            "provides": ["pillow_heif", "rawpy"], "python_paths": ["lib"],
+            "dll_dirs": ["lib/pillow_heif.libs", "lib/rawpy.libs", "lib/rawpy"]}
+
+
+BUILDERS = {"qtwebengine": build_qtwebengine, "onnxruntime": build_onnxruntime, "pillow": build_pillow,
+            "camera-formats": build_camera_formats}
 
 
 def zip_dir(folder, dest):

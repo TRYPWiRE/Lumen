@@ -1,0 +1,9 @@
+{
+  "id": "video-to-gif",
+  "name": "Video to GIF",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Turn a clip from any common video (MP4, MOV, MKV, WebM, AVI…) into a GIF or animated WebP in its own tab: pick start, length, frame rate and width, see the real file size before saving, or open the frames as layers in Lumen.",
+  "min_app": "0.6.0",
+  "requires": [{"id": "pillow", "provides": ["PIL"]}]
+}

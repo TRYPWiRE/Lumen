@@ -68,6 +68,19 @@ def _check_runtimes(app):
     return lines
 
 
+def _check_video():
+    """The video tools need Qt Multimedia's FFmpeg backend inside Lumen.exe."""
+    try:
+        from PyQt6.QtMultimedia import QMediaFormat
+        fmts = QMediaFormat().supportedFileFormats(QMediaFormat.ConversionMode.Decode)
+        names = {QMediaFormat.fileFormatName(f) for f in fmts}
+        if not fmts:
+            return "video decoder: FAILED no video formats (multimedia backend missing)"
+        return f"video decoder: ok ({len(fmts)} formats, MPEG-4: {'yes' if 'MPEG-4' in names else 'no'})"
+    except Exception as e:  # noqa: BLE001
+        return f"video decoder: FAILED {type(e).__name__}: {e}"
+
+
 def main():
     _windows_setup()
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
@@ -94,6 +107,7 @@ def main():
         report = [f"{e.id} {e.version}: {'loaded' if e.loaded else e.error or 'disabled'}"
                   for e in win.extensions.items.values()]
         report += _check_runtimes(app)
+        report.append(_check_video())
         bad = bad or any("FAILED" in line for line in report)
         out = os.environ.get("LUMEN_CHECK_OUTPUT")      # windowed .exe has no console: write a file instead
         if out:

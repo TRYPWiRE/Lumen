@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QTabBar, QProgressDialog, QMainWindow, QWidget, QVB
                              QMenu, QSizePolicy, QPushButton, QListWidget, QListWidgetItem, QApplication,
                              QDialog, QTextBrowser)
 
-from . import icons, theme, imageops, __version__
+from . import media, icons, theme, imageops, __version__
 from .context import AppContext
 from .document import Document
 from .canvas import Canvas
@@ -103,7 +103,7 @@ class ToolGroupButton(QToolButton):
             p = QPainter(self)
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor("#9a9a9a"))
+            p.setBrush(QColor(theme.C["text_dim"]))
             w, h = self.width(), self.height()
             p.drawPolygon(QPolygonF([QPointF(w - 3, h - 8), QPointF(w - 3, h - 3), QPointF(w - 8, h - 3)]))
 
@@ -147,7 +147,7 @@ class WelcomePage(QWidget):
         h.setObjectName("Heading")
         right.addWidget(h)
         self.recent = QListWidget()
-        self.recent.setStyleSheet(f"background: {theme.PASTEBOARD};")
+        self.recent.setObjectName("RecentList")
         self.recent.itemActivated.connect(lambda it: win.open_path(it.data(Qt.ItemDataRole.UserRole)))
         self.recent.itemClicked.connect(lambda it: win.open_path(it.data(Qt.ItemDataRole.UserRole)))
         right.addWidget(self.recent, 1)
@@ -193,6 +193,7 @@ class MainWindow(QMainWindow):
         self.set_tool("brush")
         self._init_extensions()
         self._update_actions()
+        theme.notifier.changed.connect(self._theme_changed)
 
     # ================================================================ building
     def _build_options_bar(self):
@@ -204,7 +205,7 @@ class MainWindow(QMainWindow):
         self.tool_badge = QLabel()
         self.tool_badge.setFixedSize(34, 28)
         self.tool_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.tool_badge.setStyleSheet(f"background: {theme.PRESSED}; border-radius: 4px;")
+        self.tool_badge.setObjectName("ToolBadge")
         tb.addWidget(self.tool_badge)
         sep = QWidget()
         sep.setFixedWidth(8)
@@ -366,7 +367,7 @@ class MainWindow(QMainWindow):
         A["save"] = self._act(m, "Save", self.save, "Ctrl+S")
         A["save_as"] = self._act(m, "Save As…", self.save_as, "Shift+Ctrl+S")
         A["export"] = self._act(m, "Export As…", self.export_as, "Alt+Shift+Ctrl+W")
-        m.addSeparator()
+        self._file_tail = m.addSeparator()       # extension submenus (e.g. File ▸ Export) go above this
         self._act(m, "Exit", self.close, "Ctrl+Q")
 
         m = mb.addMenu("&Edit")
@@ -473,6 +474,10 @@ class MainWindow(QMainWindow):
         self.menus["plugins"] = m
         mb.insertMenu(window_menu.menuAction(), m)   # Photoshop order: … Plugins, Window, Help
 
+        from .themeui import ThemesMenu
+        self.themes_menu = ThemesMenu(self)
+        mb.addMenu(self.themes_menu)
+
         m = mb.addMenu("&Help")
         self._act(m, "Check for Updates…", lambda: self.check_for_updates(manual=True))
         A["auto_check"] = self._act(m, "Check for Updates on Startup", self._toggle_setting("updates/check_on_start"),
@@ -528,7 +533,7 @@ class MainWindow(QMainWindow):
         if self.options_stack.indexOf(w) < 0:
             self.options_stack.addWidget(w)
         self.options_stack.setCurrentWidget(w)
-        self.tool_badge.setPixmap(icons.pixmap(tool.icon, 20, QColor("#e8e8e8")))
+        self.tool_badge.setPixmap(icons.pixmap(tool.icon, 20, QColor(theme.C["text_strong"])))
         self.tool_badge.setToolTip(tool.title)
         tool.activate(cv)
         for i in range(self.docs.count()):
@@ -721,9 +726,28 @@ class MainWindow(QMainWindow):
 
     def open_dialog(self):
         start = self.ctx.settings.value("last_dir", os.path.expanduser("~"))
-        paths, _ = QFileDialog.getOpenFileNames(self, "Open", start, OPEN_FILTER)
+        paths, _ = QFileDialog.getOpenFileNames(self, "Open", start, self.open_filter())
         for p in paths:
             self.open_path(p)
+
+    def open_filter(self):
+        """File ▸ Open filter, including formats extensions taught Lumen to read (HEIC, RAW, AVIF…)."""
+        base = ["*.psd", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff", "*.ico", "*.ppm",
+                "*.pgm", "*.pbm", "*.xpm"]
+        extra = []
+        for exts, label, _ in getattr(self, "file_readers", []):
+            pats = [f"*{e}" for e in exts]
+            base += [x for x in pats if x not in base]
+            extra.append(f"{label} ({' '.join(pats)})")
+        return ";;".join([f"All Formats ({' '.join(base)})", "Photoshop (*.psd)",
+                          "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff)"] + extra + ["All Files (*)"])
+
+    def _reader_for(self, path):
+        ext = os.path.splitext(path)[1].lower()
+        for exts, _, fn in getattr(self, "file_readers", []):
+            if ext in exts:
+                return fn
+        return None
 
     def open_path(self, path):
         if not path:
@@ -743,9 +767,21 @@ class MainWindow(QMainWindow):
             self.ctx.settings.setValue("last_dir", os.path.dirname(path))
             self._add_recent(path)
             return self.add_document(doc)
-        reader = QImageReader(path)
-        reader.setAutoTransform(True)
-        img = reader.read()
+        ext_reader = self._reader_for(path)
+        if ext_reader is not None:
+            try:
+                img = ext_reader(path)
+                if img is None or img.isNull():
+                    raise ValueError("the file couldn't be decoded")
+            except media.Deferred:
+                return None
+            except Exception as e:
+                QMessageBox.warning(self, "Lumen", f"Could not open “{os.path.basename(path)}”.\n\n{e}")
+                return None
+        else:
+            reader = QImageReader(path)
+            reader.setAutoTransform(True)
+            img = reader.read()
         if img.isNull():
             QMessageBox.warning(self, "Lumen", f"Could not open “{os.path.basename(path)}”.\n\n{reader.errorString()}")
             self._remove_recent(path)
@@ -776,6 +812,13 @@ class MainWindow(QMainWindow):
             return True
         img = doc.flattened()
         quality = -1
+        if fmt in getattr(self, "file_writers", {}):
+            try:
+                self.file_writers[fmt][1](img, path, doc)
+            except Exception as e:
+                QMessageBox.critical(self, "Lumen", f"Could not save “{os.path.basename(path)}”.\n\n{e}")
+                return False
+            return True
         if fmt == "jpg":
             dlg = QualityDialog("JPEG", self, int(self.ctx.settings.value("jpeg_quality", 90)))
             if not dlg.exec():
@@ -789,6 +832,12 @@ class MainWindow(QMainWindow):
             quality = dlg.value()
             self.ctx.settings.setValue("webp_quality", quality)
         return self.write_image(img, path, fmt, quality, doc.dpi)
+
+    def save_filters(self):
+        out = dict(SAVE_FILTERS)
+        for ext, (label, _) in getattr(self, "file_writers", {}).items():
+            out[f"{label} (*.{ext})"] = ext
+        return out
 
     def write_image(self, img, path, fmt, quality=-1, dpi=72):
         if fmt in ("jpg", "bmp"):
@@ -838,12 +887,13 @@ class MainWindow(QMainWindow):
         default = {"jpeg": "jpg", "tiff": "tif"}.get(default, default)
         flt0 = next((f for f, e in SAVE_FILTERS.items() if e == default), "PNG (*.png)")
         path, flt = QFileDialog.getSaveFileName(self, title, os.path.join(start_dir, f"{base}.{default}"),
-                                                ";;".join(SAVE_FILTERS), flt0)
+                                                ";;".join(self.save_filters()), flt0)
         if not path:
             return None
         ext = os.path.splitext(path)[1].lower().lstrip(".")
-        if ext not in ("psd", "png", "jpg", "jpeg", "bmp", "webp", "tif", "tiff"):
-            path += "." + SAVE_FILTERS.get(flt, default)
+        known = {"psd", "png", "jpg", "jpeg", "bmp", "webp", "tif", "tiff"} | set(self.file_writers)
+        if ext not in known:
+            path += "." + self.save_filters().get(flt, default)
         self.ctx.settings.setValue("last_dir", os.path.dirname(path))
         return path
 
@@ -1198,7 +1248,7 @@ class MainWindow(QMainWindow):
         dlg.resize(520, 600)
         lay = QVBoxLayout(dlg)
         tb = QTextBrowser()
-        tb.setStyleSheet(f"background: {theme.BG}; border: none;")
+        tb.setObjectName("Plain")
         rows = []
         for gid, names, _ in TOOL_GROUPS:
             for n in names:
@@ -1214,6 +1264,22 @@ class MainWindow(QMainWindow):
         tb.setHtml(html)
         lay.addWidget(tb)
         dlg.exec()
+
+    # ---------------------------------------------------------------- themes
+    def open_theme_editor(self, new=True):
+        from .themeui import ThemeEditor
+        dlg = ThemeEditor(self, base=theme.current(), new=new)
+        dlg.exec()
+        return dlg
+
+    def _theme_changed(self, t):
+        """Refresh the few things that keep pixmaps/colours rather than repainting from the theme."""
+        tool = getattr(self.ctx, "tool", None)
+        if tool is not None:
+            self.tool_badge.setPixmap(icons.pixmap(tool.icon, 20, QColor(theme.C["text_strong"])))
+        for w in self.findChildren(QWidget):
+            w.update()
+        self._emit_ext("theme_changed", t)
 
     def about(self):
         QMessageBox.about(self, "About Lumen",
@@ -1252,6 +1318,8 @@ class MainWindow(QMainWindow):
 
     def _init_extensions(self):
         self.ext_events = {}
+        self.file_readers = []          # [(('.heic', …), "HEIC images", fn(path) -> QImage)]
+        self.file_writers = {}          # {"gif": ("GIF", fn(qimage, path, doc))}
         self.ctx.toolChanged.connect(lambda t: self._emit_ext("tool_changed", t))
         self.last_filter = None
         self._ext_actions = []
@@ -1286,6 +1354,8 @@ class MainWindow(QMainWindow):
                 found = QMenu(name, menu)
                 if menu is self.menus.get("filter"):
                     menu.insertMenu(self._filter_tail, found)
+                elif menu is self.menus.get("file"):
+                    menu.insertMenu(self._file_tail, found)
                 else:
                     menu.addMenu(found)
             menu = found
@@ -1478,10 +1548,7 @@ class MainWindow(QMainWindow):
 
     def ensure_runtimes(self, ext, then=None):
         """Download any runtime packs `ext` still needs (once), then load it."""
-        from . import runtimes
-        missing = [r for r in ext.missing_runtimes]
-
-        def finish():
+        def finish(_ok=True):
             if self.extensions.load(ext):
                 self.statusBar().showMessage(f"{ext.name} is ready.", 6000)
             elif ext.error:
@@ -1490,6 +1557,17 @@ class MainWindow(QMainWindow):
             self._update_actions()
             if then:
                 then()
+        self.download_runtimes(list(ext.missing_runtimes), ext.name, finish)
+
+    def download_runtimes(self, rids, for_what, then=None):
+        """Download + activate runtime packs `rids` (once each), then call then(all_ok)."""
+        from . import runtimes
+        missing = [r for r in rids]
+        failed = []
+
+        def finish():
+            if then:
+                then(not failed)
 
         def step():
             if not missing:
@@ -1504,11 +1582,12 @@ class MainWindow(QMainWindow):
                     self.checker.failed.connect(_retry_fail)
                     self.checker.check()
                     return
-                QMessageBox.warning(self, "Lumen", f"{ext.name} needs “{rid}”, which isn't available to download "
+                QMessageBox.warning(self, "Lumen", f"{for_what} needs “{rid}”, which isn't available to download "
                                     "yet. Check your connection, or try again later.")
+                failed.append(rid)
                 return finish()
             task = runtimes.download_task(rid, entry)
-            prog = self._progress(f"Downloading {runtimes.describe(entry, rid)} for {ext.name}…\n"
+            prog = self._progress(f"Downloading {runtimes.describe(entry, rid)} for {for_what}…\n"
                                   "This only happens once.")
             prog.canceled.connect(task.cancel)
             task.progress.connect(lambda d, t: prog.setValue(int(d * 100 / t)) if t else prog.setRange(0, 0))
@@ -1522,6 +1601,7 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     prog.close()
                     QMessageBox.warning(self, "Lumen", f"Couldn't install {entry.get('name', rid)}.\n\n{e}")
+                    failed.append(rid)
                     return finish()
                 finally:
                     try:
@@ -1533,6 +1613,7 @@ class MainWindow(QMainWindow):
 
             def fail(msg):
                 prog.close()
+                failed.append(rid)
                 if msg != "Cancelled":
                     QMessageBox.warning(self, "Lumen", f"Couldn't download {entry.get('name', rid)}.\n\n{msg}")
                 finish()
@@ -1546,6 +1627,7 @@ class MainWindow(QMainWindow):
 
         def _retry_fail(*_):
             self._disconnect_retry(_retry, _retry_fail)
+            failed.extend(missing[:1])
             missing.pop(0) if missing else None
             QMessageBox.warning(self, "Lumen", "Couldn't reach GitHub to download what this extension needs.")
             finish()
@@ -1591,6 +1673,24 @@ class MainWindow(QMainWindow):
     def open_image_document(self, img, name=None):
         img = imageops.to_working(img)
         doc = Document(img, name=name or None, transparent=img.hasAlphaChannel())
+        cv = self.add_document(doc)
+        self.show_workspace(0)
+        return cv
+
+    def open_layers_document(self, images, name=None, layer_names=None):
+        """Open a new document with one layer per image (bottom → top), e.g. the frames of an animation."""
+        from .layers import Layer
+        imgs = [imageops.to_working(i) for i in images if i is not None and not i.isNull()]
+        if not imgs:
+            return None
+        w = max(i.width() for i in imgs)
+        h = max(i.height() for i in imgs)
+        names = list(layer_names or [])
+        layers = []
+        for n, im in enumerate(imgs):
+            off = QPoint((w - im.width()) // 2, (h - im.height()) // 2)
+            layers.append(Layer(names[n] if n < len(names) else f"Frame {n + 1}", im, off))
+        doc = Document(size=QSize(w, h), layers=layers, name=name or None)
         cv = self.add_document(doc)
         self.show_workspace(0)
         return cv

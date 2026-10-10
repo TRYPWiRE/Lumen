@@ -1,0 +1,9 @@
+{
+  "id": "batch-converter",
+  "name": "Batch Converter",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Convert and resize images in batches in its own tab: PNG, JPEG, WebP, AVIF, BMP, GIF, TIFF and ICO from almost anything - including PSD, HEIC and camera RAW (Canon, Nikon, Sony, Fuji…). Animated GIF/WebP stay animated. Also lets File ▸ Open read HEIC, AVIF and RAW, and Save As write GIF, AVIF and ICO.",
+  "min_app": "0.6.0",
+  "requires": [{"id": "pillow", "provides": ["PIL"]}]
+}

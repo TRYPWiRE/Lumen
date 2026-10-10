@@ -6,6 +6,8 @@ from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal, QRect
 from PyQt6.QtGui import QImage, QPainter, QColor, QPen, QPixmap, QBrush, QCursor
 from PyQt6.QtWidgets import QWidget
 
+from lumen import theme
+
 
 def _box(a, r, axis):
     if r < 1:
@@ -235,9 +237,9 @@ class CutoutCanvas(QWidget):
 
     def paintEvent(self, ev):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#1f1f1f"))
+        p.fillRect(self.rect(), QColor(theme.PASTEBOARD))       # follows the Lumen theme
         if self.image is None:
-            p.setPen(QColor("#8f8f8f"))
+            p.setPen(QColor(theme.TEXT_DIM))
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
                        "Open an image, or bring one over from Lumen.\nThe chequered areas will be see-through.")
             return

@@ -10,7 +10,7 @@ from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineS
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 from .fetcher import Fetcher
-from .gallery import Gallery
+from .gallery import Gallery, _colors, on_theme_changed
 
 HOME = "https://duckduckgo.com/"
 
@@ -137,8 +137,8 @@ class WebImagesWorkspace(QWidget):
         self.progress = QProgressBar()
         self.progress.setFixedHeight(2)
         self.progress.setTextVisible(False)
-        self.progress.setStyleSheet("QProgressBar { background: transparent; border: none; }"
-                                    "QProgressBar::chunk { background: #2680eb; }")
+        self._style_progress()
+        on_theme_changed(self._style_progress)
         bl.addWidget(self.progress)
         self.tabs = QTabBar()
         self.tabs.setObjectName("DocTabs")
@@ -180,6 +180,10 @@ class WebImagesWorkspace(QWidget):
             self._sized = True
             h = self.split.height()
             self.split.setSizes([int(h * 0.56), h - int(h * 0.56)])
+
+    def _style_progress(self, *_):
+        self.progress.setStyleSheet("QProgressBar { background: transparent; border: none; }"
+                                    f"QProgressBar::chunk {{ background: {_colors()['accent']}; }}")
 
     def shutdown(self):
         """Delete every page before Qt releases the browser profile (otherwise Qt WebEngine crashes on exit)."""
@@ -226,8 +230,9 @@ class WebImagesWorkspace(QWidget):
         close.setText("×")
         close.setFixedSize(18, 18)
         close.setToolTip("Close tab")
-        close.setStyleSheet("QToolButton { border-radius: 9px; padding: 0; color: #aaa; }"
-                            "QToolButton:hover { background: #555; color: white; }")
+        c = _colors()
+        close.setStyleSheet(f"QToolButton {{ border-radius: 9px; padding: 0; color: {c['text_dim']}; }}"
+                            f"QToolButton:hover {{ background: {c['hover']}; color: {c['text_strong']}; }}")
         close.clicked.connect(lambda _, v=v: v in self.views and self.close_tab(self.views.index(v)))
         self.tabs.setTabButton(i, QTabBar.ButtonPosition.RightSide, close)
         v.titleChanged.connect(lambda t, v=v: self._set_title(v, t))

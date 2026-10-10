@@ -1,12 +1,13 @@
 """Vector icons drawn at runtime with QPainter (no image files needed)."""
 import math
-from PyQt6.QtCore import Qt, QPointF, QRectF
+from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
 from PyQt6.QtGui import (QIcon, QPixmap, QPainter, QPen, QColor, QPainterPath,
-                         QLinearGradient, QCursor, QFont, QBrush, QPolygonF)
+                         QLinearGradient, QCursor, QFont, QBrush, QPolygonF, QIconEngine)
 
-ICON_COLOR = QColor("#c9c9c9")
+ICON_COLOR = QColor("#c9c9c9")      # kept for old extensions; real colours come from the theme
 ICON_ACTIVE = QColor("#ffffff")
 _cache = {}
+_pm_cache = {}
 
 
 def _pen(c, w=1.5):
@@ -443,26 +444,189 @@ def d_restore(p, c):
     p.drawLine(QPointF(20, 13), QPointF(20, 19))
 
 
+def d_convert(p, c):
+    """Two arrows chasing each other (convert / batch)."""
+    p.setPen(_pen(c, 1.7))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawArc(QRectF(4, 4, 16, 16), 30 * 16, 150 * 16)
+    p.drawArc(QRectF(4, 4, 16, 16), 210 * 16, 150 * 16)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    p.drawPolygon(_poly((3.2, 9.8), (7.8, 10.6), (4.1, 14.2)))
+    p.drawPolygon(_poly((20.8, 14.2), (16.2, 13.4), (19.9, 9.8)))
+
+
+def d_film(p, c):
+    """Film strip with a play triangle (video)."""
+    p.setPen(_pen(c, 1.5))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(QRectF(3, 5, 18, 14), 2, 2)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    for x in (5, 9, 13, 17):
+        p.drawRect(QRectF(x, 6.6, 2, 1.6))
+        p.drawRect(QRectF(x, 15.8, 2, 1.6))
+    p.drawPolygon(_poly((10, 9.5), (15, 12), (10, 14.5)))
+
+
+def _label_icon(p, c, text, size=6.6):
+    p.setPen(_pen(c, 1.5))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(QRectF(2.5, 5, 19, 14), 3, 3)
+    f = QFont("Segoe UI")
+    f.setPixelSize(int(size * 10))
+    f.setBold(True)
+    path = QPainterPath()
+    path.addText(0, 0, f, text)
+    br = path.boundingRect()
+    p.save()
+    sc = min(15.0 / br.width(), 7.5 / br.height())
+    p.translate(12 - br.center().x() * sc, 12 - br.center().y() * sc)
+    p.scale(sc, sc)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    p.drawPath(path)
+    p.restore()
+
+
+def d_gif(p, c):
+    _label_icon(p, c, "GIF")
+
+
+def d_webp(p, c):
+    _label_icon(p, c, "WEBP")
+
+
+def d_compress(p, c):
+    """Arrows squeezing inward onto a picture (optimise)."""
+    p.setPen(_pen(c, 1.5))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(QRectF(7.5, 7.5, 9, 9), 1.5, 1.5)
+    for (x1, y1, x2, y2) in ((2.5, 2.5, 6, 6), (21.5, 2.5, 18, 6), (2.5, 21.5, 6, 18), (21.5, 21.5, 18, 18)):
+        p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+    for (x, y, dx, dy) in ((6, 6, -1, -1), (18, 6, 1, -1), (6, 18, -1, 1), (18, 18, 1, 1)):
+        p.drawPolyline(_poly((x + 3 * dx, y), (x, y), (x, y + 3 * dy)))
+
+
+def d_frame_grab(p, c):
+    """A single frame lifted out of a film strip."""
+    p.setPen(_pen(c, 1.4))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRect(QRectF(2.5, 3, 11, 18))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    for y in (5, 9, 13, 17):
+        p.drawRect(QRectF(3.8, y, 1.6, 2))
+    p.setPen(_pen(c, 1.6))
+    p.setBrush(QColor(c.red(), c.green(), c.blue(), 60))
+    p.drawRoundedRect(QRectF(9.5, 8, 12, 9), 1.5, 1.5)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    p.drawPolygon(_poly((12, 15.5), (15, 11.5), (17.2, 14), (18.4, 12.8), (20, 15.5)))
+
+
+def d_grid(p, c):
+    """Sprite sheet grid (flipbook)."""
+    p.setPen(_pen(c, 1.4))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(QRectF(3, 3, 18, 18), 2, 2)
+    p.drawLine(QPointF(9, 3), QPointF(9, 21))
+    p.drawLine(QPointF(15, 3), QPointF(15, 21))
+    p.drawLine(QPointF(3, 12), QPointF(21, 12))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    for i, (x, y) in enumerate(((6, 7.5), (12, 7.5), (18, 7.5), (6, 16.5), (12, 16.5), (18, 16.5))):
+        p.drawEllipse(QPointF(x, y + (-1 + (i % 3)) * 0.8), 1.3, 1.3)
+
+
+def d_overlay(p, c):
+    """A picture placed over another (overlay studio)."""
+    p.setPen(_pen(c, 1.5))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(QRectF(2.5, 4, 14, 11), 1.5, 1.5)
+    p.setBrush(QColor(c.red(), c.green(), c.blue(), 70))
+    p.drawRoundedRect(QRectF(9, 10, 12.5, 10), 1.5, 1.5)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    p.drawEllipse(QPointF(6.5, 8), 1.6, 1.6)
+
+
 DRAWINGS = {k[2:]: v for k, v in dict(globals()).items() if k.startswith("d_")}
+
+
+def _mode_color(mode, state):
+    from . import theme
+    c = theme.C
+    if mode == QIcon.Mode.Disabled:
+        return QColor(theme.mix(c["icon"], c["window"], 0.55))
+    if mode in (QIcon.Mode.Active, QIcon.Mode.Selected) or state == QIcon.State.On:
+        return QColor(c["text_strong"])
+    return QColor(c["icon"])
+
+
+class ThemedIconEngine(QIconEngine):
+    """Draws a vector icon in the current theme's colours, so icons follow theme changes live."""
+
+    def __init__(self, name, size=24):
+        super().__init__()
+        self.name = name
+        self.size = size
+
+    def clone(self):
+        return ThemedIconEngine(self.name, self.size)
+
+    def key(self):
+        return "lumen-themed"
+
+    def availableSizes(self, mode=QIcon.Mode.Normal, state=QIcon.State.Off):
+        return [QSize(self.size, self.size)]
+
+    def actualSize(self, size, mode, state):
+        s = min(size.width(), size.height())
+        return QSize(s, s)
+
+    def _render(self, px, mode, state, scale=1.0):
+        col = _mode_color(mode, state)
+        key = (self.name, px, round(scale * 100), col.rgba())
+        pm = _pm_cache.get(key)
+        if pm is None:
+            pm = pixmap(self.name, px, col, scale)
+            if len(_pm_cache) > 3000:
+                _pm_cache.clear()
+            _pm_cache[key] = pm
+        return pm
+
+    def pixmap(self, size, mode, state):
+        return QPixmap(self._render(min(size.width(), size.height()), mode, state, 1.0))
+
+    def scaledPixmap(self, size, mode, state, scale):
+        # Qt 6 passes the logical size plus the screen scale: draw at size × scale for crisp HiDPI icons
+        return QPixmap(self._render(min(size.width(), size.height()), mode, state, max(1.0, scale)))
+
+    def paint(self, painter, rect, mode, state):
+        scale = painter.device().devicePixelRatioF() if painter.device() else 1.0
+        s = min(rect.width(), rect.height())
+        pm = self._render(s, mode, state, scale)
+        painter.drawPixmap(QRectF(rect.x() + (rect.width() - s) / 2, rect.y() + (rect.height() - s) / 2, s, s), pm,
+                           QRectF(pm.rect()))
 
 
 def icon(name, size=24) -> QIcon:
     key = (name, size)
-    if key in _cache:
-        return _cache[key]
-    ic = QIcon()
-    for mode, col in ((QIcon.Mode.Normal, ICON_COLOR), (QIcon.Mode.Active, ICON_ACTIVE),
-                      (QIcon.Mode.Selected, ICON_ACTIVE),
-                      (QIcon.Mode.Disabled, QColor("#5e5e5e"))):
-        for scale in (1, 2):
-            ic.addPixmap(pixmap(name, size, col, scale), mode, QIcon.State.Off)
-            if mode == QIcon.Mode.Normal:
-                ic.addPixmap(pixmap(name, size, ICON_ACTIVE, scale), mode, QIcon.State.On)
-    _cache[key] = ic
-    return ic
+    if key not in _cache:
+        _cache[key] = QIcon(ThemedIconEngine(name, size))
+    return _cache[key]
 
 
-def pixmap(name, size=24, color=ICON_COLOR, scale=2) -> QPixmap:
+def theme_changed():
+    """Called by theme.apply(): forget pixmaps drawn in the old colours."""
+    _pm_cache.clear()
+
+
+def pixmap(name, size=24, color=None, scale=2) -> QPixmap:
+    if color is None:
+        from . import theme
+        color = theme.C["icon"]
     pm = QPixmap(int(size * scale), int(size * scale))
     pm.setDevicePixelRatio(scale)
     pm.fill(Qt.GlobalColor.transparent)

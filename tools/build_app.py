@@ -68,6 +68,11 @@ def main(argv=None):
                 "importlib", "encodings", "html", "sqlite3", "ctypes", "unittest", "zoneinfo", "tomllib", "wsgiref"):
         if importlib.util.find_spec(pkg) is not None:
             args += ["--collect-submodules", pkg]
+    # Qt's video decoder (FFmpeg inside Qt) is used by the video tools; PyInstaller's hook brings its plugins
+    args += ["--hidden-import", "PyQt6.QtMultimedia", "--hidden-import", "lumen.media"]
+    # Pillow / HEIC / RAW come from runtime packs (downloaded once), so don't freeze whatever is installed here
+    for mod in ("PIL", "pillow_heif", "rawpy", "onnxruntime", "imageio_ffmpeg"):
+        args += ["--exclude-module", mod]
     args.append(os.path.join(ROOT, "main.py"))
     args += list(argv or [])
     print(f"Bundling extensions: {', '.join(staged) or 'none'}")

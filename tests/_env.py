@@ -11,6 +11,7 @@ if sys.platform == "win32" and "QT_QPA_FONTDIR" not in os.environ:
     os.environ["QT_QPA_FONTDIR"] = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
 
 os.environ["LUMEN_OFFLINE"] = "1"
+os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.*=false")      # FFmpeg's stream dumps
 _tmp = tempfile.mkdtemp(prefix="lumen-tests-")
 os.environ["LUMEN_SETTINGS"] = os.path.join(_tmp, "settings.ini")
 os.environ["LUMEN_DATA_DIR"] = os.path.join(_tmp, "data")
@@ -22,7 +23,7 @@ _QCA.setAttribute(_Qt.ApplicationAttribute.AA_ShareOpenGLContexts)   # same as m
 # Hide harmless messages from the offscreen platform so real failures are easy to spot.
 from PyQt6.QtCore import qInstallMessageHandler  # noqa: E402
 
-_QUIET = ("setting window opacity", "propagateSizeHints", "does not support raise", "grabbing the keyboard", "grabbing the mouse")
+_QUIET = ("setting window opacity", "Qt multimedia with FFmpeg", "No HW decoder", "No RHI backend", "propagateSizeHints", "does not support raise", "grabbing the keyboard", "grabbing the mouse")
 
 
 def _qt_messages(mode, context, message):

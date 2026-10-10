@@ -65,14 +65,15 @@ class NewDocumentDialog(QDialog):
 
         # presets list (left)
         left = QWidget()
-        left.setStyleSheet(f"background: {theme.BG_DARK};")
+        left.setObjectName("SidePane")
+        left.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         ll = QVBoxLayout(left)
         ll.setContentsMargins(14, 16, 8, 16)
         lab = QLabel("PRESETS")
         lab.setObjectName("Dim")
         ll.addWidget(lab)
         self.presets = QListWidget()
-        self.presets.setStyleSheet(f"background: {theme.BG_DARK};")
+        self.presets.setObjectName("SidePane")
         self.presets.setFixedWidth(230)
         items = list(PRESETS[1:])
         if clipboard_size:
@@ -268,8 +269,8 @@ class AnchorGrid(QWidget):
             for c in range(3):
                 rect = QRect(c * 28 + 2, r * 28 + 2, 24, 24)
                 sel = (c, r) == self.anchor
-                p.fillRect(rect, QColor(theme.ACCENT if sel else "#454545"))
-                p.setPen(QColor("#222"))
+                p.fillRect(rect, QColor(theme.C["accent"] if sel else theme.C["button"]))
+                p.setPen(QColor(theme.C["border"]))
                 p.drawRect(rect.adjusted(0, 0, -1, -1))
 
     def mousePressEvent(self, ev):

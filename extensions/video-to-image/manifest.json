@@ -1,0 +1,8 @@
+{
+  "id": "video-to-image",
+  "name": "Video to Image",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Scrub through any video frame by frame in its own tab (zoom the slider in for precise picking), then save the exact frame, copy it, open it in Lumen or add it as a layer. Can also export a whole run of frames as PNGs or layers.",
+  "min_app": "0.6.0"
+}

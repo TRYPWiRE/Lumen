@@ -1,0 +1,6 @@
+# Only for running the tests and building. Lumen.exe does NOT bundle these: the app downloads them once
+# as runtime packs when an extension needs them (tools/build_runtimes.py builds those packs).
+pillow
+pillow-heif
+rawpy
+pefile

@@ -36,8 +36,12 @@ def save_manifest(data, path=MANIFEST):
 
 
 def zip_folder(folder, dest):
-    """Deterministic zip (fixed timestamps) so unchanged extensions keep the same hash."""
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+    """Byte-for-byte identical zip on every computer, so the SHA-256 in the manifest always matches.
+
+    Files are stored, not compressed: Python on Windows (3.14+, zlib-ng) and on Linux compress differently,
+    which made the same extension produce different hashes on different machines. Extensions are tiny, and
+    GitHub compresses downloads anyway. Timestamps, permissions and the "made on" OS are fixed too."""
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_STORED) as z:
         for base, dirs, files in os.walk(folder):
             dirs[:] = sorted(d for d in dirs if d != "__pycache__" and not d.startswith("."))
             for name in sorted(files):
@@ -46,8 +50,9 @@ def zip_folder(folder, dest):
                 full = os.path.join(base, name)
                 arc = os.path.relpath(full, folder).replace(os.sep, "/")
                 info = zipfile.ZipInfo(arc, date_time=(1980, 1, 1, 0, 0, 0))
-                info.compress_type = zipfile.ZIP_DEFLATED
+                info.compress_type = zipfile.ZIP_STORED
                 info.external_attr = 0o644 << 16
+                info.create_system = 3          # the default differs on Windows (0) and Linux (3)
                 with open(full, "rb") as f:
                     z.writestr(info, f.read())
 

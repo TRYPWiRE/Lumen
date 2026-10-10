@@ -1,0 +1,9 @@
+{
+  "id": "gif-optimiser",
+  "name": "GIF Optimiser",
+  "version": "1.0.0",
+  "author": "Lumen",
+  "description": "Shrink a GIF in its own tab: a Compression slider, one-click Discord Emoji / Sticker presets and 1-500 MiB target sizes, a before/after preview, and optional resizing for social posts.",
+  "min_app": "0.6.0",
+  "requires": [{"id": "pillow", "provides": ["PIL"]}]
+}

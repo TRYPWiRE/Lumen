@@ -23,8 +23,17 @@ installer/lumen.iss                <- Inno Setup script
 
 ## Runtime packs (one-time setup, and again whenever Qt changes)
 
-Web Images Extractor needs Qt's web engine, and Background Remover needs onnxruntime. Those are too big
-for the installer, so they're published as **runtime packs** on a GitHub pre-release tagged `runtimes`.
+Some extensions need big libraries, which are too big for the installer. They're published as
+**runtime packs** on a GitHub pre-release tagged `runtimes`:
+
+| Pack | Used by | Size |
+|---|---|---|
+| `qtwebengine` | Web Images Extractor | ~134 MB |
+| `onnxruntime` | Background Remover (AI) | ~15 MB |
+| `pillow` | Batch Converter, Video to GIF, GIF / Image Optimiser, WebP to GIF, WebP Flipbook, Overlay Studio | ~7 MB |
+| `camera-formats` | HEIC and camera RAW files (Batch Converter and File ▸ Open), downloaded only when one is opened | ~8 MB |
+
+Video decoding (Video to GIF, Video to Image) uses Qt Multimedia, which is bundled in Lumen.exe.
 
 1. Run `publish_runtimes.bat`. It downloads the official wheels, keeps exactly the libraries Lumen.exe
    doesn't already contain, zips them and uploads them. It then adds the packs to `updates/manifest.json`
