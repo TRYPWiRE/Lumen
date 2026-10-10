@@ -1,11 +1,5 @@
 {
-  "app": {
-    "version": "0.4.1",
-    "url": "https://github.com/TRYPWiRE/Lumen/releases/download/v0.4.1/LumenSetup-0.4.1.exe",
-    "sha256": "237d06151be08929854407f5714a1b7e2077ef6376b59e227b0598816ba06e9f",
-    "size": 148435846,
-    "notes": ""
-  },
+  "app": {},
   "extensions": [
     {
       "id": "adjustments",
@@ -15,19 +9,19 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/adjustments-1.0.0.zip",
-      "sha256": "a8d7262bf710d6095f86ffc5c92be969ba1d8f6ad2b45981710e57959d4891cb",
-      "size": 6856
+      "sha256": "b909017e5d8324991178a2b25e4b37b6da0385d08414c6d33462d624a9f0f941",
+      "size": 6811
     },
     {
       "id": "background-remover",
       "name": "Background Remover",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Cut subjects out of their background in a dedicated tab: AI subject detection (U\u00b2-Net), a magic wand, erase/restore brushes and edge clean-up. Also adds Layer \u25b8 Remove Background and Select \u25b8 Subject.",
       "author": "Lumen",
       "min_app": "0.4.0",
-      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/background-remover-1.0.0.zip",
-      "sha256": "979ccfa6ed367cd140cffb34d1bbb8fff787349cb8099efba59282ec31966afe",
-      "size": 11682,
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/background-remover-1.0.1.zip",
+      "sha256": "66a753dbf6366c217fc7f68b20a459d1507f9e95d9b8838d19761fe8735a5b52",
+      "size": 11755,
       "requires": [
         "onnxruntime"
       ]
@@ -40,8 +34,8 @@
       "author": "Lumen",
       "min_app": "0.2.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/basic-filters-1.1.0.zip",
-      "sha256": "aaf51bc03bd83674abe7e4a744aa970ed0dc6087476894a51f8aee68d77ec752",
-      "size": 2657
+      "sha256": "3fac65b61512311effa58ced0b2debeee9e19eeaf48782302823c3c6679abde2",
+      "size": 2653
     },
     {
       "id": "creative-filters",
@@ -51,8 +45,8 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/creative-filters-1.0.0.zip",
-      "sha256": "a89ea3c910165f865dc647344890eab2f69374ffe204c470bb8ca0c27b3dfb81",
-      "size": 6197
+      "sha256": "08698c40de840a29ba4912718be9156d47e8b30678b414791fdd2b76203ec843",
+      "size": 6120
     },
     {
       "id": "layer-effects",
@@ -62,19 +56,19 @@
       "author": "Lumen",
       "min_app": "0.4.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/layer-effects-1.0.0.zip",
-      "sha256": "8f460ad68ede60fc53b4aee3436a6d70a1a3df33d3b3bafba751dfe9e3273e60",
-      "size": 3803
+      "sha256": "0fa49221dfb0eda8407e76f2219cbe2b11441007b021aefa22107b65a6a1a158",
+      "size": 3771
     },
     {
       "id": "web-images-extractor",
       "name": "Web Images Extractor",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "A built-in web browser in its own tab. Browse any page, collect every image it shows (lazy-loaded ones too), then add them to your Lumen project as layers, open them as documents or save them.",
       "author": "Lumen",
       "min_app": "0.4.0",
-      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/web-images-extractor-1.0.1.zip",
-      "sha256": "9e668e937ad5a3a35184438f37dc1308dc61b97df2317403d175eeeb7b2eb135",
-      "size": 10834,
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/web-images-extractor-1.0.2.zip",
+      "sha256": "7ff447671652809dd8c22f64ba5665eecca4afaac82cb614936832dbf2bd9112",
+      "size": 11418,
       "requires": [
         "qtwebengine"
       ]
@@ -87,7 +81,7 @@
         "version": "6.11.2",
         "qt": "6.11.2",
         "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/qtwebengine-6.11.2-win64.zip",
-        "sha256": "2251ad926d664b8f84f7212e3bd76d5a9138ea318e747f030a98f18c14dc8a9a",
+        "sha256": "682f5a2c212631309891d0696d4b48429c912801f72960ea41be47ab8e7506ab",
         "size": 144786234
       }
     },
@@ -97,7 +91,7 @@
         "version": "1.31.0",
         "qt": "",
         "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/onnxruntime-1.31.0-win64.zip",
-        "sha256": "1dd6ce12db2c387325c5410d6ffd280019d89b0853a79d3dd5e2142cce1f09d4",
+        "sha256": "efbb2902583f32a03e7a6b494059d559e916d657d293d6406ee525b3bc09b642",
         "size": 15860794
       }
     }
