@@ -1,12 +1,31 @@
 {
-  "app": {
-    "version": "0.3.0",
-    "url": "https://github.com/TRYPWiRE/Lumen/releases/download/v0.3.0/LumenSetup-0.3.0.exe",
-    "sha256": "ff3a238d9e87d01d4574de1c8af7f05b00b832d24aefcc65ca043913cd3e87fc",
-    "size": 36339936,
-    "notes": ""
-  },
+  "app": {},
   "extensions": [
+    {
+      "id": "adjustments",
+      "name": "Adjustments Pro",
+      "version": "1.0.0",
+      "description": "Photoshop's core adjustments: Levels, Curves, Exposure, Vibrance, Hue/Saturation, Color Balance, Black & White, Photo Filter, Gradient Map, Shadows/Highlights, Equalize, plus Auto Tone, Auto Contrast and Auto Color.",
+      "author": "Lumen",
+      "min_app": "0.4.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/adjustments-1.0.0.zip",
+      "sha256": "b909017e5d8324991178a2b25e4b37b6da0385d08414c6d33462d624a9f0f941",
+      "size": 6811
+    },
+    {
+      "id": "background-remover",
+      "name": "Background Remover",
+      "version": "1.0.0",
+      "description": "Cut subjects out of their background in a dedicated tab: AI subject detection (U\u00b2-Net), a magic wand, erase/restore brushes and edge clean-up. Also adds Layer \u25b8 Remove Background and Select \u25b8 Subject.",
+      "author": "Lumen",
+      "min_app": "0.4.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/background-remover-1.0.0.zip",
+      "sha256": "e2b9c38222197e76bb70ee4c4278c0b8d586730e854025b227644df25ba233e5",
+      "size": 11712,
+      "requires": [
+        "onnxruntime"
+      ]
+    },
     {
       "id": "basic-filters",
       "name": "Basic Filters",
@@ -15,8 +34,66 @@
       "author": "Lumen",
       "min_app": "0.2.0",
       "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/basic-filters-1.1.0.zip",
-      "sha256": "c454825fc79a1283b486c3dd105d5251be787af8a6fbcc46e86d89fd02e3c79a",
-      "size": 2649
+      "sha256": "3fac65b61512311effa58ced0b2debeee9e19eeaf48782302823c3c6679abde2",
+      "size": 2653
+    },
+    {
+      "id": "creative-filters",
+      "name": "Creative Filters",
+      "version": "1.0.0",
+      "description": "Photoshop's creative filter menu: Motion & Radial Blur, Twirl, Pinch, Spherize, Ripple, Wave, Polar Coordinates, Median, Dust & Scratches, Color Halftone, Crystallize, Clouds, Vignette, Emboss, Find Edges, Oil Paint, Solarize, Diffuse, High Pass, Minimum/Maximum and Offset.",
+      "author": "Lumen",
+      "min_app": "0.4.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/creative-filters-1.0.0.zip",
+      "sha256": "08698c40de840a29ba4912718be9156d47e8b30678b414791fdd2b76203ec843",
+      "size": 6120
+    },
+    {
+      "id": "layer-effects",
+      "name": "Layer Effects",
+      "version": "1.0.0",
+      "description": "Photoshop-style layer styles \u2014 Drop Shadow, Outer Glow, Inner Shadow, Inner Glow, Stroke, Color Overlay, Gradient Overlay and Bevel & Emboss \u2014 each created on its own layer with a live preview (Layer \u25b8 Layer Style).",
+      "author": "Lumen",
+      "min_app": "0.4.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/layer-effects-1.0.0.zip",
+      "sha256": "0fa49221dfb0eda8407e76f2219cbe2b11441007b021aefa22107b65a6a1a158",
+      "size": 3771
+    },
+    {
+      "id": "web-images-extractor",
+      "name": "Web Images Extractor",
+      "version": "1.0.1",
+      "description": "A built-in web browser in its own tab. Browse any page, collect every image it shows (lazy-loaded ones too), then add them to your Lumen project as layers, open them as documents or save them.",
+      "author": "Lumen",
+      "min_app": "0.4.0",
+      "url": "https://raw.githubusercontent.com/TRYPWiRE/Lumen/main/updates/extensions/web-images-extractor-1.0.1.zip",
+      "sha256": "33dbec5cdedbef8b86beb790183930f5f36996ff3133cef0bd5d9640d9c896ed",
+      "size": 10847,
+      "requires": [
+        "qtwebengine"
+      ]
     }
-  ]
+  ],
+  "runtimes": {
+    "qtwebengine": {
+      "win64": {
+        "name": "Web engine (Chromium)",
+        "version": "6.11.2",
+        "qt": "6.11.2",
+        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/qtwebengine-6.11.2-win64.zip",
+        "sha256": "2251ad926d664b8f84f7212e3bd76d5a9138ea318e747f030a98f18c14dc8a9a",
+        "size": 144786234
+      }
+    },
+    "onnxruntime": {
+      "win64": {
+        "name": "AI engine (onnxruntime)",
+        "version": "1.31.0",
+        "qt": "",
+        "url": "https://github.com/TRYPWiRE/Lumen/releases/download/runtimes/onnxruntime-1.31.0-win64.zip",
+        "sha256": "1dd6ce12db2c387325c5410d6ffd280019d89b0853a79d3dd5e2142cce1f09d4",
+        "size": 15860794
+      }
+    }
+  }
 }
